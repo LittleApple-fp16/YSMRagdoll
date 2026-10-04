@@ -33,4 +33,11 @@ class YsmMixinCompatibilityTest {
                     .anyMatch(method -> method.getName().contains(target[1])), target[0]);
         }
     }
+
+    @Test
+    void officialYsmExposesClientModelStateOnEntity() throws Exception {
+        Class<?> entity = Class.forName("net.minecraft.world.entity.Entity", false, getClass().getClassLoader());
+        assertTrue(Arrays.stream(entity.getMethods()).anyMatch(YsmPlatform::isModelStateGetter),
+                "Fabric entity must expose YSM's selected model state, including inherited model IDs");
+    }
 }

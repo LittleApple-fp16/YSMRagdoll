@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -37,7 +37,14 @@ final class OpenYsmGeometryLoader {
 
     static List<RagdollDefinition.Bone> enrich(List<RagdollDefinition.Bone> runtimeBones,
                                                List<String> identifiers) {
-        Geometry geometry = findGeometry(runtimeBones, identifiers);
+        Path ysmRoot = Minecraft.getInstance().gameDirectory.toPath()
+                .resolve("config").resolve("yes_steve_model");
+        return enrich(ysmRoot, runtimeBones, identifiers);
+    }
+
+    static List<RagdollDefinition.Bone> enrich(Path ysmRoot, List<RagdollDefinition.Bone> runtimeBones,
+                                               List<String> identifiers) {
+        Geometry geometry = findGeometry(ysmRoot, runtimeBones, identifiers);
         if (geometry == null) {
             YsmRagdollLog.warn("未定位到当前模型的 OpenYSM main.json，使用骨骼枢轴尺寸后备");
             return runtimeBones;
@@ -45,19 +52,19 @@ final class OpenYsmGeometryLoader {
 
         Map<String, Integer> runtimeIndices = new HashMap<>();
         for (RagdollDefinition.Bone bone : runtimeBones) {
-            runtimeIndices.putIfAbsent(normalize(bone.name()), bone.index());
+            runtimeIndices.putIfAbsent(bone.name(), bone.index());
         }
         List<RagdollDefinition.Bone> result = new ArrayList<>(runtimeBones.size());
         int geometryMatches = 0;
         for (RagdollDefinition.Bone bone : runtimeBones) {
-            GeometryBone source = geometry.bones.get(normalize(bone.name()));
+            GeometryBone source = geometry.bones.get(bone.name());
             if (source == null) {
                 result.add(bone);
                 continue;
             }
             geometryMatches++;
             int parent = source.parentName.isEmpty()
-                    ? -1 : runtimeIndices.getOrDefault(normalize(source.parentName), -1);
+                    ? -1 : runtimeIndices.getOrDefault(source.parentName, -1);
             result.add(new RagdollDefinition.Bone(bone.index(), bone.name(), parent,
                     new Vector3f(source.pivot), new Vector3f(source.minimum),
                     new Vector3f(source.maximum), bone.initialGlobal()));
@@ -67,20 +74,18 @@ final class OpenYsmGeometryLoader {
         return List.copyOf(result);
     }
 
-    private static Geometry findGeometry(List<RagdollDefinition.Bone> runtimeBones,
+    private static Geometry findGeometry(Path ysmRoot, List<RagdollDefinition.Bone> runtimeBones,
                                          List<String> identifiers) {
-        Path ysmRoot = Minecraft.getInstance().gameDirectory.toPath()
-                .resolve("config").resolve("yes_steve_model");
         List<Path> descriptors = new ArrayList<>();
         for (String identifier : identifiers) {
             addDescriptorCandidates(ysmRoot, identifier, descriptors);
         }
-        Geometry decrypted = bestDecryptedGeometry(ysmRoot, identifiers, runtimeBones);
-        if (decrypted != null && score(decrypted, runtimeBones) >= runtimeBones.size() * 8) {
+        Geometry decrypted = bestDecryptedGeometry(ysmRoot, identifiers, runtimeBones, false);
+        if (matchesSkeleton(decrypted, runtimeBones)) {
             return decrypted;
         }
         Geometry best = bestGeometry(descriptors, runtimeBones);
-        if (best != null && score(best, runtimeBones) >= runtimeBones.size() * 8) {
+        if (matchesSkeleton(best, runtimeBones)) {
             return best;
         }
 
@@ -102,17 +107,19 @@ final class OpenYsmGeometryLoader {
         best = bestGeometry(descriptors, runtimeBones);
         // 普通 YSM 模型共享大量标准骨骼名称；匹配不足时宁可使用当前模型自身的枢轴，
         // 也不能把另一个角色的立方体尺寸套进来。
-        return best != null && score(best, runtimeBones) >= runtimeBones.size() * 10
-                ? best : null;
+        if (matchesSkeleton(best, runtimeBones)) return best;
+        // Fabric's native mesh omits hierarchy, and older captures may have no model ID.
+        // Encrypted custom models must participate in the signature fallback too.
+        decrypted = bestDecryptedGeometry(ysmRoot, identifiers, runtimeBones, true);
+        return matchesSkeleton(decrypted, runtimeBones) ? decrypted : null;
     }
 
     /** 优先解密当前模型的 crypto=3 文件，取得二进制中已经烘焙好的真实面顶点。 */
     private static Geometry bestDecryptedGeometry(Path ysmRoot,
                                                    List<String> identifiers,
-                                                   List<RagdollDefinition.Bone> runtimeBones) {
-        Geometry best = null;
-        int bestScore = Integer.MIN_VALUE;
-        Set<Path> candidates = new HashSet<>();
+                                                   List<RagdollDefinition.Bone> runtimeBones,
+                                                   boolean scan) {
+        Set<Path> candidates = new LinkedHashSet<>();
         for (String identifier : identifiers) {
             String clean = identifier == null ? "" : identifier.replace('\\', '/');
             while (clean.startsWith("/")) clean = clean.substring(1);
@@ -125,6 +132,20 @@ final class OpenYsmGeometryLoader {
                 }
             }
         }
+        if (scan) {
+            for (String rootName : MODEL_ROOTS) {
+                Path root = ysmRoot.resolve(rootName);
+                if (!Files.isDirectory(root)) continue;
+                try (Stream<Path> files = Files.find(root, 5,
+                        (path, attributes) -> attributes.isRegularFile()
+                                && path.getFileName().toString().endsWith(".ysm"))) {
+                    files.sorted(java.util.Comparator.comparingLong(OpenYsmGeometryLoader::fileSize))
+                            .forEach(candidates::add);
+                } catch (IOException exception) {
+                    YsmRagdollLog.warn("扫描 YSM 加密模型目录失败: " + root + ", " + exception);
+                }
+            }
+        }
         for (Path candidate : candidates) {
             try {
                 byte[] decrypted = OpenYsmCrypto.decryptYsmFile(Files.readAllBytes(candidate));
@@ -133,22 +154,36 @@ final class OpenYsmGeometryLoader {
                     raw = parser.deserialize();
                 }
                 Geometry geometry = fromBinaryGeometry(candidate, raw);
+                if (!matchesSkeleton(geometry, runtimeBones)) continue;
                 int score = score(geometry, runtimeBones);
-                if (score > bestScore) {
-                    best = geometry;
-                    bestScore = score;
-                }
                 YsmRagdollLog.info("OpenYSM 加密模型解密完成: 文件=" + candidate
                         + ", format=" + raw.formatVersion + ", 几何骨骼="
                         + (raw.mainEntity.mainModel == null ? 0 : raw.mainEntity.mainModel.bones.size())
                         + ", 匹配分数=" + score);
+                return geometry;
             } catch (Throwable exception) {
                 YsmRagdollLog.warn("OpenYSM 加密模型解密或解析失败: 文件=" + candidate
                         + ", 原因=" + exception.getClass().getSimpleName() + ": "
                         + String.valueOf(exception.getMessage()));
             }
         }
-        return best;
+        return null;
+    }
+
+    private static long fileSize(Path path) {
+        try { return Files.size(path); }
+        catch (IOException ignored) { return Long.MAX_VALUE; }
+    }
+
+    /** Hierarchy recovery requires every bone and pivot, not just common limb names. */
+    private static boolean matchesSkeleton(Geometry geometry, List<RagdollDefinition.Bone> runtimeBones) {
+        if (geometry == null || runtimeBones.isEmpty()) return false;
+        for (RagdollDefinition.Bone bone : runtimeBones) {
+            GeometryBone source = geometry.bones.get(bone.name());
+            if (source == null || !Float.isFinite(source.pivot.distance(bone.pivot()))
+                    || source.pivot.distance(bone.pivot()) > 0.02F) return false;
+        }
+        return true;
     }
 
     private static Geometry fromBinaryGeometry(Path source, RawYsmModel raw) {
@@ -180,7 +215,7 @@ final class OpenYsmGeometryLoader {
             }
             Vector3f pivot = rawBone.pivot == null || rawBone.pivot.length < 3
                     ? new Vector3f() : new Vector3f(rawBone.pivot);
-            bones.putIfAbsent(normalize(rawBone.name), new GeometryBone(rawBone.name,
+            bones.putIfAbsent(rawBone.name, new GeometryBone(rawBone.name,
                     rawBone.parentName == null ? "" : rawBone.parentName,
                     pivot, minimum, maximum));
         }
@@ -228,7 +263,7 @@ final class OpenYsmGeometryLoader {
     private static int score(Geometry geometry, List<RagdollDefinition.Bone> runtimeBones) {
         int score = 0;
         for (RagdollDefinition.Bone runtime : runtimeBones) {
-            GeometryBone candidate = geometry.bones.get(normalize(runtime.name()));
+            GeometryBone candidate = geometry.bones.get(runtime.name());
             if (candidate == null) {
                 continue;
             }
@@ -274,7 +309,7 @@ final class OpenYsmGeometryLoader {
                     if (!boneElement.isJsonObject()) continue;
                     GeometryBone bone = readBone(boneElement.getAsJsonObject());
                     if (!bone.name.isEmpty()) {
-                        parsed.putIfAbsent(normalize(bone.name), bone);
+                        parsed.putIfAbsent(bone.name, bone);
                     }
                 }
                 result.add(new Geometry(modelFile, parsed));
@@ -366,10 +401,6 @@ final class OpenYsmGeometryLoader {
         }
         return new Vector3f(array.get(0).getAsFloat(), array.get(1).getAsFloat(),
                 array.get(2).getAsFloat());
-    }
-
-    private static String normalize(String value) {
-        return value == null ? "" : value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
     private record Geometry(Path source, Map<String, GeometryBone> bones) {

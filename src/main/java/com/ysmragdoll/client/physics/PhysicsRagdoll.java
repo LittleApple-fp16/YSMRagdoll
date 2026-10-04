@@ -105,15 +105,15 @@ public final class PhysicsRagdoll {
 
     public static PhysicsRagdoll create(ClientPhysicsWorld world, PlayerDeathSnapshot snapshot,
                                         OpenYsmModelAdapter.PhysicsModelView model) {
-        RagdollDefinition definition = YsmSkeletonExtractor.extract(model);
-        if (!definition.parts().containsKey(RagdollDefinition.Role.BODY)) {
-            YsmRagdollLog.warn("YSM 模型没有可识别的躯干骨骼，当前尸体继续使用静态快照");
-            return null;
-        }
         try {
+            RagdollDefinition definition = YsmSkeletonExtractor.extract(model);
+            if (!definition.parts().containsKey(RagdollDefinition.Role.BODY)) {
+                YsmRagdollLog.warn("YSM 模型没有可识别的可见躯干骨骼，当前尸体继续使用静态快照");
+                return null;
+            }
             return new PhysicsRagdoll(world, snapshot, model, definition);
         } catch (RuntimeException exception) {
-            YsmRagdollLog.warn("创建 JBullet 布娃娃失败，当前尸体继续使用静态快照: " + exception);
+            YsmRagdollLog.warn("创建 JBullet 布娃娃失败，当前尸体继续使用静态快照", exception);
             return null;
         }
     }
@@ -136,55 +136,63 @@ public final class PhysicsRagdoll {
         Vector3f initialVelocity = new Vector3f((float) snapshot.velocityX() * 20.0F,
                 (float) snapshot.velocityY() * 20.0F, (float) snapshot.velocityZ() * 20.0F);
 
-        for (RagdollDefinition.Part part : definition.parts().values()) {
-            RagdollDefinition.Bone bone = definition.bones().get(part.boneIndex());
-            Matrix4f worldMatrix = new Matrix4f(base).mul(bone.initialGlobal());
-            org.joml.Vector3f center = worldMatrix.transformPosition(new org.joml.Vector3f(part.center()));
-            Transform transform = transform(worldMatrix, center);
-            Matrix4f boneToBody = BonePoseMath.bind(transform, worldMatrix);
-            org.joml.Vector3f half = BonePoseMath.halfExtents(boneToBody, part.halfExtents());
-            BoxShape shape = new BoxShape(new Vector3f(half.x, half.y, half.z));
-            shape.setMargin(0.01F);
-            Vector3f inertia = new Vector3f();
-            shape.calculateLocalInertia(part.mass(), inertia);
-            RigidBody body = new RigidBody(new RigidBodyConstructionInfo(part.mass(),
-                    new DefaultMotionState(transform), shape, inertia));
-            body.setLinearVelocity(initialVelocity);
-            // 死亡快照没有可靠角速度；给各肢体随机自旋会让约束从第一帧开始互相对抗。
-            body.setAngularVelocity(new Vector3f());
-            // A corpse should not gain energy when a limb settles onto a block.
-            body.setRestitution(0.0F);
-            body.setSleepingThresholds(0.12F, 0.15F);
-            float smallestHalfExtent = Math.min(half.x, Math.min(half.y, half.z));
-            body.setCcdMotionThreshold(Math.max(0.025F, smallestHalfExtent * 0.5F));
-            body.setCcdSweptSphereRadius(Math.max(0.02F, smallestHalfExtent * 0.8F));
-            // 只参与方块碰撞，布娃娃各刚体之间由关节控制，不再额外互相挤压。
-            world.addRagdollBody(body, this);
-            BodyPart bodyPart = new BodyPart(part, body, copy(transform), boneToBody, half);
-            bodies.put(part.role(), bodyPart);
+        try {
+            for (RagdollDefinition.Part part : definition.parts().values()) {
+                RagdollDefinition.Bone bone = definition.bones().get(part.boneIndex());
+                Matrix4f worldMatrix = new Matrix4f(base).mul(bone.initialGlobal());
+                if (!BonePoseMath.usable(worldMatrix)) continue;
+                org.joml.Vector3f center = worldMatrix.transformPosition(new org.joml.Vector3f(part.center()));
+                Transform transform = transform(worldMatrix, center);
+                Matrix4f boneToBody = BonePoseMath.bind(transform, worldMatrix);
+                org.joml.Vector3f half = BonePoseMath.halfExtents(boneToBody, part.halfExtents());
+                BoxShape shape = new BoxShape(new Vector3f(half.x, half.y, half.z));
+                shape.setMargin(0.01F);
+                Vector3f inertia = new Vector3f();
+                shape.calculateLocalInertia(part.mass(), inertia);
+                RigidBody body = new RigidBody(new RigidBodyConstructionInfo(part.mass(),
+                        new DefaultMotionState(transform), shape, inertia));
+                body.setLinearVelocity(initialVelocity);
+                // 死亡快照没有可靠角速度；给各肢体随机自旋会让约束从第一帧开始互相对抗。
+                body.setAngularVelocity(new Vector3f());
+                // A corpse should not gain energy when a limb settles onto a block.
+                body.setRestitution(0.0F);
+                body.setSleepingThresholds(0.12F, 0.15F);
+                float smallestHalfExtent = Math.min(half.x, Math.min(half.y, half.z));
+                body.setCcdMotionThreshold(Math.max(0.025F, smallestHalfExtent * 0.5F));
+                body.setCcdSweptSphereRadius(Math.max(0.02F, smallestHalfExtent * 0.8F));
+                // 只参与方块碰撞，布娃娃各刚体之间由关节控制，不再额外互相挤压。
+                world.addRagdollBody(body, this);
+                BodyPart bodyPart = new BodyPart(part, body, copy(transform), boneToBody, half);
+                bodies.put(part.role(), bodyPart);
+            }
+            playerCollision = new PlayerCollisionResponse(
+                    bodies.values().stream().map(BodyPart::body).toList(), world::updateBodyAabb);
+            BodyPart bodyPart = bodies.get(RagdollDefinition.Role.BODY);
+            if (bodyPart == null) throw new IllegalArgumentException("YSM 躯干姿态不可用于物理模拟");
+            RagdollDefinition.Bone bodyBone = definition.bones().get(bodyPart.part.boneIndex());
+            org.joml.Vector3f bodyPivot = new Matrix4f(base)
+                    .mul(bodyBone.initialGlobal())
+                    .transformPosition(new org.joml.Vector3f(bodyBone.pivot()).mul(1.0F / 16.0F));
+            initialBodyPivot.set(bodyPivot.x, bodyPivot.y, bodyPivot.z);
+            float floorCorrection = alignToSpawnFloor(snapshot.y() + collisionOffset.y);
+            org.joml.Vector3f correctedBodyPivot = new org.joml.Vector3f(bodyPivot);
+            correctedBodyPivot.y += floorCorrection;
+            bodyCenterOffsetLocal.set(bodyPart.initialTransform.origin);
+            bodyCenterOffsetLocal.sub(new Vector3f(correctedBodyPivot.x, correctedBodyPivot.y,
+                    correctedBodyPivot.z));
+            Matrix3f inverseBodyBasis = new Matrix3f(bodyPart.initialTransform.basis);
+            inverseBodyBasis.invert();
+            inverseBodyBasis.transform(bodyCenterOffsetLocal);
+            createConstraints(base, floorCorrection);
+            updateMaterial();
+            YsmRagdollLog.info("已创建 JBullet 布娃娃: 玩家=" + snapshot.playerId()
+                    + ", 刚体=" + bodies.size() + ", 关节=" + constraints.size()
+                    + ", 绑定模式=各部位完整姿态");
+        } catch (RuntimeException exception) {
+            // A failed constructor must not leave invisible bodies/constraints in the shared world.
+            dispose();
+            throw exception;
         }
-        playerCollision = new PlayerCollisionResponse(
-                bodies.values().stream().map(BodyPart::body).toList(), world::updateBodyAabb);
-        BodyPart bodyPart = bodies.get(RagdollDefinition.Role.BODY);
-        RagdollDefinition.Bone bodyBone = definition.bones().get(bodyPart.part.boneIndex());
-        org.joml.Vector3f bodyPivot = new Matrix4f(base)
-                .mul(bodyBone.initialGlobal())
-                .transformPosition(new org.joml.Vector3f(bodyBone.pivot()).mul(1.0F / 16.0F));
-        initialBodyPivot.set(bodyPivot.x, bodyPivot.y, bodyPivot.z);
-        float floorCorrection = alignToSpawnFloor(snapshot.y() + collisionOffset.y);
-        org.joml.Vector3f correctedBodyPivot = new org.joml.Vector3f(bodyPivot);
-        correctedBodyPivot.y += floorCorrection;
-        bodyCenterOffsetLocal.set(bodyPart.initialTransform.origin);
-        bodyCenterOffsetLocal.sub(new Vector3f(correctedBodyPivot.x, correctedBodyPivot.y,
-                correctedBodyPivot.z));
-        Matrix3f inverseBodyBasis = new Matrix3f(bodyPart.initialTransform.basis);
-        inverseBodyBasis.invert();
-        inverseBodyBasis.transform(bodyCenterOffsetLocal);
-        createConstraints(base, floorCorrection);
-        updateMaterial();
-        YsmRagdollLog.info("已创建 JBullet 布娃娃: 玩家=" + snapshot.playerId()
-                + ", 刚体=" + bodies.size() + ", 关节=" + constraints.size()
-                + ", 绑定模式=各部位完整姿态");
     }
 
     /**
@@ -772,7 +780,9 @@ public final class PhysicsRagdoll {
     private void createConstraints(Matrix4f base, float floorCorrection) {
         for (Map.Entry<RagdollDefinition.Role, BodyPart> entry : bodies.entrySet()) {
             RagdollDefinition.Role childRole = entry.getKey();
-            BodyPart parent = bodies.get(parentOf(childRole));
+            RagdollDefinition.Role parentRole = parentOf(childRole);
+            while (parentRole != null && !bodies.containsKey(parentRole)) parentRole = parentOf(parentRole);
+            BodyPart parent = bodies.get(parentRole);
             if (parent == null) {
                 continue;
             }

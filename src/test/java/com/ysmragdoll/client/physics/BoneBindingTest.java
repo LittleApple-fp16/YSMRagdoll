@@ -68,6 +68,25 @@ public class BoneBindingTest {
     }
 
     @Test
+    public void hiddenPhysicalLimbDoesNotPreventVisibleBodyFromSimulating() throws Exception {
+        try (Fixture fixture = new Fixture(false, true)) {
+            assertEquals(1, fixture.parts.size());
+            fixture.verify(true);
+            var bullet = (com.bulletphysics.dynamics.DiscreteDynamicsWorld) field(fixture.world, "world");
+            Transform before = ((RigidBody) component(fixture.parts.values().iterator().next(), "body"))
+                    .getWorldTransform(new Transform());
+            for (int i = 0; i < 30; i++) bullet.stepSimulation(1.0F / 120, 0);
+            Transform after = ((RigidBody) component(fixture.parts.values().iterator().next(), "body"))
+                    .getWorldTransform(new Transform());
+            assertTrue("Visible body must fall under gravity", after.origin.y < before.origin.y - 0.1F);
+            fixture.ragdoll.writePose();
+            assertEquals(0, fixture.pose[42], 0);
+            assertEquals(0, fixture.pose[43], 0);
+            assertEquals(0, fixture.pose[44], 0);
+        }
+    }
+
+    @Test
     public void collisionExtentsIncludeRootAndBoneScale() {
         Matrix4f model = new Matrix4f().translation(13, 64, -8).rotateY(0.7F).scale(-2, 3, 4);
         Vector3f center = new Vector3f(0.2F, 1.2F, -0.3F);
@@ -140,6 +159,10 @@ public class BoneBindingTest {
         final Map<Integer, Matrix4f> expectedBinding = new HashMap<>();
 
         Fixture(boolean nonuniform) throws Exception {
+            this(nonuniform, false);
+        }
+
+        Fixture(boolean nonuniform, boolean hiddenLimb) throws Exception {
             System.setProperty("ysmragdoll.projectDir", "build/binding-test");
             CommentedConfig config = CommentedConfig.inMemory();
             YsmRagdollConfig.SPEC.correct(config);
@@ -155,6 +178,7 @@ public class BoneBindingTest {
                 pose[i * 12 + 5] = 0.3F * i;
             }
             if (nonuniform) { pose[18] = 0.8F; pose[19] = 1.5F; pose[20] = 1.1F; }
+            if (hiddenLimb) pose[42] = pose[43] = pose[44] = 0;
             pose[66] = pose[67] = pose[68] = 0;
             captured = pose.clone();
             int[] parents = {-1, 0, 1, 2, 3, 3};

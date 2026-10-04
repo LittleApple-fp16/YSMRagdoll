@@ -10,6 +10,12 @@ import org.joml.Vector3f;
 final class BonePoseMath {
     private BonePoseMath() {}
 
+    /** Zero scales hide variant bones; these matrices cannot define physical bodies. */
+    static boolean usable(Matrix4f matrix) {
+        float determinant = matrix.determinant3x3();
+        return matrix.isFinite() && Float.isFinite(determinant) && Math.abs(determinant) > 1.0E-12F;
+    }
+
     static Matrix4f local(Vector3f pivot, float[] parameters, int index) {
         int p = index * 12;
         return new Matrix4f().translate((pivot.x - parameters[p + 3]) / 16.0F,

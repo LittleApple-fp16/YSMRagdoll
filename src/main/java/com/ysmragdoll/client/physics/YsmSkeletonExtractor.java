@@ -98,7 +98,11 @@ public final class YsmSkeletonExtractor {
             }
 
             if (cubeListField == null) {
-                bones = new ArrayList<>(OpenYsmGeometryLoader.enrich(bones, view.modelIdentifiers()));
+                List<RagdollDefinition.Bone> enriched = OpenYsmGeometryLoader.enrich(bones, view.modelIdentifiers());
+                if (parentField == null && enriched == bones && bones.size() > 1) {
+                    throw new IllegalStateException("YSM 原生骨骼没有父索引，且未找到匹配模型的真实层级");
+                }
+                bones = new ArrayList<>(enriched);
                 Matrix4f[] enrichedGlobals = calculateInitialMatrices(bones, view.boneTransforms());
                 for (int index = 0; index < bones.size(); index++) {
                     RagdollDefinition.Bone bone = bones.get(index);
@@ -240,7 +244,7 @@ public final class YsmSkeletonExtractor {
             RagdollDefinition.Bone best = null;
             int bestScore = 0;
             for (RagdollDefinition.Bone bone : bones) {
-                if (used.contains(bone.index())) {
+                if (used.contains(bone.index()) || !BonePoseMath.usable(bone.initialGlobal())) {
                     continue;
                 }
                 int score = score(role, normalize(bone.name()));
@@ -256,17 +260,10 @@ public final class YsmSkeletonExtractor {
             mapped.put(role, best);
         }
 
-        // AllHead 是 YSM 的层级容器，真正的头部网格通常位于其子骨骼 Head。
-        // 优先选择带有真实网格的 Head，避免把只有颈部定位小方块的容器当成头部刚体。
+        // Keep AllHead as the pose binding so hair/accessory siblings of Head follow it.
+        // Use the Head mesh for collision dimensions instead of the container's neck marker.
         RagdollDefinition.Bone physicalHead = findBone(bones, "head");
         RagdollDefinition.Bone selectedHead = mapped.get(RagdollDefinition.Role.HEAD);
-        if (physicalHead != null && physicalHead != selectedHead) {
-            if (selectedHead != null) {
-                used.remove(selectedHead.index());
-            }
-            mapped.put(RagdollDefinition.Role.HEAD, physicalHead);
-            used.add(physicalHead.index());
-        }
 
         EnumMap<RagdollDefinition.Role, RagdollDefinition.Part> result =
                 new EnumMap<>(RagdollDefinition.Role.class);
@@ -275,8 +272,14 @@ public final class YsmSkeletonExtractor {
             RagdollDefinition.Bone bone = entry.getValue();
             Vector3f center;
             Vector3f half;
-            Bounds aggregate = role == RagdollDefinition.Role.BODY && !bone.hasGeometry()
-                    ? aggregateBodyBounds(bone, bones) : null;
+            Bounds aggregate = null;
+            if (role == RagdollDefinition.Role.HEAD && physicalHead != null
+                    && selectedHead != physicalHead && isDescendant(physicalHead, bone, bones)) {
+                aggregate = new Bounds();
+                includeTransformedBounds(aggregate, bone, physicalHead);
+            } else if (role == RagdollDefinition.Role.BODY && !bone.hasGeometry()) {
+                aggregate = aggregateBodyBounds(bone, bones);
+            }
             if (aggregate != null && aggregate.isFinite()) {
                 Vector3f size = new Vector3f(aggregate.maximum).sub(aggregate.minimum);
                 center = new Vector3f(aggregate.minimum).add(aggregate.maximum).mul(0.5F);
@@ -298,11 +301,34 @@ public final class YsmSkeletonExtractor {
 
     private static RagdollDefinition.Bone findBone(List<RagdollDefinition.Bone> bones, String expectedName) {
         for (RagdollDefinition.Bone bone : bones) {
-            if (normalize(bone.name()).equals(expectedName) && bone.hasGeometry()) {
+            if (normalize(bone.name()).equals(expectedName) && bone.hasGeometry()
+                    && BonePoseMath.usable(bone.initialGlobal())) {
                 return bone;
             }
         }
         return null;
+    }
+
+    private static boolean isDescendant(RagdollDefinition.Bone child, RagdollDefinition.Bone parent,
+                                         List<RagdollDefinition.Bone> bones) {
+        int index = child.parentIndex();
+        for (int remaining = bones.size(); index >= 0 && remaining-- > 0; index = bones.get(index).parentIndex()) {
+            if (index == parent.index()) return true;
+        }
+        return false;
+    }
+
+    private static void includeTransformedBounds(Bounds bounds, RagdollDefinition.Bone reference,
+                                                  RagdollDefinition.Bone geometry) {
+        Matrix4f transform = new Matrix4f(reference.initialGlobal()).invert().mul(geometry.initialGlobal());
+        for (int corner = 0; corner < 8; corner++) {
+            Vector3f point = new Vector3f(
+                    (corner & 1) == 0 ? geometry.minimum().x : geometry.maximum().x,
+                    (corner & 2) == 0 ? geometry.minimum().y : geometry.maximum().y,
+                    (corner & 4) == 0 ? geometry.minimum().z : geometry.maximum().z);
+            transform.transformPosition(point);
+            bounds.include(point.x, point.y, point.z);
+        }
     }
 
     /** 把身体子骨骼的真实网格转换到 AllBody 的局部坐标后合并。 */
@@ -537,12 +563,24 @@ public final class YsmSkeletonExtractor {
         int bestScore = Integer.MIN_VALUE;
         for (Field field : fields) {
             int score = 0;
+            boolean valid = true;
+            int roots = 0;
             for (int index = 0; index < bones.size(); index++) {
                 int value = field.getInt(bones.get(index));
-                if (value == -1) score += 3;
+                if (value == -1) { score += 3; roots++; }
                 else if (value >= 0 && value < index) score += 2;
-                else if (value >= bones.size()) score -= 10;
+                else if (value < 0 || value >= bones.size() || value == index) valid = false;
             }
+            // Official native bones contain a string-pool name ID, not a parent index.
+            // Never accept a field with invalid indices or a cycle as a hierarchy.
+            if (!valid || roots == 0) continue;
+            for (int index = 0; index < bones.size() && valid; index++) {
+                int current = index;
+                int remaining = bones.size();
+                while (current >= 0 && remaining-- > 0) current = field.getInt(bones.get(current));
+                if (current >= 0) valid = false;
+            }
+            if (!valid) continue;
             if (score > bestScore) {
                 bestScore = score;
                 best = field;
