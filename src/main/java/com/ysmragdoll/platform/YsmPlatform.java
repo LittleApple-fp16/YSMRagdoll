@@ -5,6 +5,7 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.fml.ModList;
 
 import java.lang.reflect.Field;
+import java.util.List;
 
 /** Forge-specific access to YSM; shared rendering never links Fabric to Forge APIs. */
 public final class YsmPlatform {
@@ -13,18 +14,38 @@ public final class YsmPlatform {
 
     private YsmPlatform() {}
 
+    public static List<String> rendererRegistries() {
+        return List.of(RENDERER_REGISTRY,
+                "com.elfmcys.yesstevemodel.client.renderer.RendererManager");
+    }
+
+    public static List<String> meshRenderers() {
+        return List.of(MESH_RENDERER,
+                "com.elfmcys.yesstevemodel.geckolib3.geo.NativeModelRenderer");
+    }
+
     public static boolean loaded() {
         return ModList.get().isLoaded("yes_steve_model");
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static Object modelState(Player player, ClassLoader loader) throws ReflectiveOperationException {
-        Class<?> provider = Class.forName(
-                "com.elfmcys.yesstevemodel.O0OooOo0oOOoOoOoOooO000o", false, loader);
-        Field field = provider.getDeclaredField("Oo0Oo0o00O00Oo0OOoOOoooo");
-        field.setAccessible(true);
-        Object handle = field.get(null);
-        return handle instanceof Capability capability
-                ? player.getCapability(capability).resolve().orElse(null) : null;
+        for (String[] binding : new String[][] {
+                {"com.elfmcys.yesstevemodel.forge.capability.PlayerCapabilityProvider", "PLAYER_CAP"},
+                {"com.elfmcys.yesstevemodel.O0OooOo0oOOoOoOoOooO000o", "Oo0Oo0o00O00Oo0OOoOOoooo"}
+        }) {
+            try {
+                Class<?> provider = Class.forName(binding[0], false, loader);
+                Field field = provider.getDeclaredField(binding[1]);
+                field.setAccessible(true);
+                Object handle = field.get(null);
+                if (handle instanceof Capability capability) {
+                    return player.getCapability(capability).resolve().orElse(null);
+                }
+            } catch (ClassNotFoundException | NoSuchFieldException ignored) {
+                // Official YSM and OpenYSM use different names for the same state.
+            }
+        }
+        return null;
     }
 }

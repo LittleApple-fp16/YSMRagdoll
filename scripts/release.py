@@ -152,11 +152,12 @@ def prepare(root, tag, target="forge-1.20.1"):
             "META-INF/licenses/OpenYSM-LICENSE.txt",
             "com/ysmragdoll/OpenYsmRagdollMod.class",
             "com/ysmragdoll/mixin/Ysm265MeshCaptureMixin.class",
+            "com/ysmragdoll/mixin/OpenYsmMeshCaptureMixin.class",
         ):
             if not archive.read(required):
                 raise ValueError("Empty required entry: " + required)
         mixin = json.loads(archive.read("ysmragdoll.mixins.json"))
-        if "Ysm265MeshCaptureMixin" not in mixin.get("client", []):
+        if not {"Ysm265MeshCaptureMixin", "OpenYsmMeshCaptureMixin"} <= set(mixin.get("client", [])):
             raise ValueError("Missing YSM capture mixin")
     write_bundle(root, jar, filename, version, notes)
 

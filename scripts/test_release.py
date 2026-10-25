@@ -91,11 +91,12 @@ versionRange="[47.4.0,48)"
                 "META-INF/licenses/OpenYSM-LICENSE.txt",
                 "com/ysmragdoll/OpenYsmRagdollMod.class",
                 "com/ysmragdoll/mixin/Ysm265MeshCaptureMixin.class",
+                "com/ysmragdoll/mixin/OpenYsmMeshCaptureMixin.class",
             ):
                 jar.writestr(required, "fixture")
             for name in PARSER_ENTRIES:
                 jar.writestr(release.PARSER_ROOT + name, "fixture")
-            jar.writestr("ysmragdoll.mixins.json", '{"client":["Ysm265MeshCaptureMixin"]}')
+            jar.writestr("ysmragdoll.mixins.json", '{"client":["Ysm265MeshCaptureMixin","OpenYsmMeshCaptureMixin"]}')
         return path
 
     def test_prepares_flat_checksum_and_matching_bytes(self):

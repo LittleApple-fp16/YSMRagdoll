@@ -10,6 +10,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.List;
 
 /** Version-specific renderer bindings are generated from the selected build target. */
 public final class YsmPlatform {
@@ -18,6 +19,14 @@ public final class YsmPlatform {
     public static final String MESH_RENDERER = BINDINGS.getProperty("mesh");
 
     private YsmPlatform() {}
+
+    public static List<String> rendererRegistries() {
+        return List.of(RENDERER_REGISTRY);
+    }
+
+    public static List<String> meshRenderers() {
+        return List.of(MESH_RENDERER);
+    }
 
     private static Properties loadBindings() {
         Properties result = new Properties();

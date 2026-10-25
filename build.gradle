@@ -60,6 +60,7 @@ dependencies {
     implementation 'javax.vecmath:vecmath:1.5.2'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'org.ow2.asm:asm-tree:9.7.1'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
     jarJar(group: 'cz.advel.jbullet', name: 'jbullet', version: '[20101010-1]') {
         transitive = false
@@ -110,6 +111,7 @@ jar.finalizedBy('reobfJar')
 
 test {
     useJUnitPlatform()
+    systemProperty 'ysmragdoll.openysmJar', findProperty('ysm_compatibility_jar') ?: ''
     afterSuite { descriptor, result ->
         if (!descriptor.parent && result.testCount == 0) {
             throw new GradleException('No tests executed')

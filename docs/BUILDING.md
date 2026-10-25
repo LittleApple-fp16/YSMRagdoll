@@ -90,6 +90,19 @@ bash ./gradlew --no-daemon --project-dir fabric -Ptarget_mc=1.21.1 -Pysm_smoke=t
 下载文件仅用于兼容性测试，保存在忽略的 `libs/compatibility/`，不随本模组分发。
 注入检查不启动游戏，不能证明模型选择、世界渲染、死亡流程和多人游戏均正常。
 
+## Forge OpenYSM 绑定检查 / OpenYSM bindings
+
+Forge 同时支持官方 YSM 2.6.5 的混淆绑定和 OpenYSM 的可读绑定。
+可用本地 OpenYSM 2.6.6.6 JAR 检查渲染器注册器、玩家状态和实际网格调用是否与捕获钩子匹配：
+
+```powershell
+.\build.ps1 --project-prop ysm_compatibility_jar=测试文件/openysm-forge-2.6.6.6.jar test
+```
+
+该 JAR 仅作为测试输入读取，不加入编译依赖或发行包。
+未指定该属性时跳过二进制绑定检查；共享测试仍检查骨骼数组冻结、纹理保留和快照重放。
+这些检查不启动游戏，不能代替安装后验证死亡生成。
+
 ## 发布脚本检查 / Release tooling
 
 ```sh

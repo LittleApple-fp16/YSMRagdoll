@@ -33,10 +33,6 @@ import java.util.UUID;
  * capability、动画控制器或 {@code tickModel()}。
  */
 public final class OpenYsmModelAdapter {
-    private static final String YSM_RENDERER_REGISTRY =
-            YsmPlatform.RENDERER_REGISTRY;
-    private static final String YSM_MESH_RENDERER =
-            YsmPlatform.MESH_RENDERER;
     private static final int CAPTURE_LIGHT = 0x00F000F0;
 
     private static final ThreadLocal<CaptureContext> ACTIVE_CAPTURE = new ThreadLocal<>();
@@ -210,6 +206,17 @@ public final class OpenYsmModelAdapter {
                                           int textureIndex, int renderPartMask,
                                           int packedLight, int packedOverlay,
                                           float red, float green, float blue, float alpha) {
+        return onYsmMeshRender(pose, mesh, boneTransforms, secondaryState, textureIndex,
+                renderPartMask, packedLight, packedOverlay, red, green, blue, alpha, null);
+    }
+
+    /** OpenYSM's textured entry point can bypass the legacy draw method entirely. */
+    public static boolean onYsmMeshRender(PoseStack.Pose pose, Object mesh,
+                                          float[] boneTransforms, float[] secondaryState,
+                                          int textureIndex, int renderPartMask,
+                                          int packedLight, int packedOverlay,
+                                          float red, float green, float blue, float alpha,
+                                          ResourceLocation texture) {
         CaptureContext context = ACTIVE_CAPTURE.get();
         if (context == null) {
             return false;
@@ -222,7 +229,7 @@ public final class OpenYsmModelAdapter {
             context.draft = new SnapshotDraft(mesh, boneTransforms.clone(),
                     secondaryState == null ? null : secondaryState.clone(),
                     textureIndex, renderPartMask, packedOverlay,
-                    red, green, blue, alpha, relativePose, relativeNormal);
+                    red, green, blue, alpha, relativePose, relativeNormal, texture);
         }
         // 让 Mixin 只取消底层顶点提交，不打断外层 YSM 渲染器，保证其 pushPose/popPose 正常配对。
         return context.suppressMeshDrawing;
@@ -295,7 +302,8 @@ public final class OpenYsmModelAdapter {
             return false;
         }
 
-        ResourceLocation texture = resolveRendererTexture(renderer, player);
+        ResourceLocation texture = context.draft.texture != null
+                ? context.draft.texture : resolveRendererTexture(renderer, player);
         Method meshRenderMethod = resolveYsmMeshRenderMethod(context.draft.mesh.getClass());
         RenderType renderType = resolveYsmRenderType(renderer, texture);
         if (texture == null || meshRenderMethod == null || renderType == null) {
@@ -334,11 +342,16 @@ public final class OpenYsmModelAdapter {
             poseStack.last().pose().mul(snapshot.relativePose);
             poseStack.last().normal().mul(snapshot.relativeNormal);
             VertexConsumer consumer = buffers.getBuffer(snapshot.renderType);
-            renderMethod.invoke(null, consumer, poseStack.last(), snapshot.mesh,
+            Object[] arguments = {consumer, poseStack.last(), snapshot.mesh,
                     snapshot.boneTransforms, snapshot.secondaryState,
                     snapshot.textureIndex, snapshot.renderPartMask,
                     light, snapshot.packedOverlay,
-                    snapshot.red, snapshot.green, snapshot.blue, snapshot.alpha);
+                    snapshot.red, snapshot.green, snapshot.blue, snapshot.alpha};
+            if (renderMethod.getParameterCount() == 14) {
+                arguments = java.util.Arrays.copyOf(arguments, 14);
+                arguments[13] = snapshot.texture;
+            }
+            renderMethod.invoke(null, arguments);
             if (!directRenderLogged) {
                 directRenderLogged = true;
                 YsmRagdollLog.info("首次直接重放独立 YSM 网格快照成功；后续不再读取玩家动画");
@@ -376,36 +389,40 @@ public final class OpenYsmModelAdapter {
         }
         rendererInitialized = true;
 
-        for (ClassLoader classLoader : classLoaders()) {
-            if (classLoader == null) {
-                continue;
-            }
-            try {
-                Class<?> registry = Class.forName(YSM_RENDERER_REGISTRY, false, classLoader);
-                YsmRagdollLog.info("已找到 YSM 渲染器注册类: " + registry.getName());
-                for (Method getter : registry.getDeclaredMethods()) {
-                    if (!Modifier.isStatic(getter.getModifiers())
-                            || getter.getParameterCount() != 0
-                            || !LivingEntityRenderer.class.isAssignableFrom(getter.getReturnType())) {
-                        continue;
-                    }
-                    getter.setAccessible(true);
-                    Object candidate = getter.invoke(null);
-                    Method playerRenderMethod = findPlayerRenderMethod(
-                            candidate == null ? null : candidate.getClass());
-                    if (candidate == null || playerRenderMethod == null) {
-                        continue;
-                    }
-                    ysmPlayerRenderer = candidate;
-                    ysmPlayerRenderMethod = playerRenderMethod;
-                    YsmRagdollLog.info("已找到 YSM 玩家渲染器: " + candidate.getClass().getName());
-                    YsmRagdollLog.info("已找到 YSM 首次捕获方法: "
-                            + playerRenderMethod.getDeclaringClass().getName()
-                            + "#" + playerRenderMethod.getName());
-                    return candidate;
+        for (String registryName : YsmPlatform.rendererRegistries()) {
+            for (ClassLoader classLoader : classLoaders()) {
+                if (classLoader == null) {
+                    continue;
                 }
-            } catch (Throwable exception) {
-                YsmRagdollLog.warn("读取 YSM 渲染器注册类失败: " + describe(exception));
+                try {
+                    Class<?> registry = Class.forName(registryName, false, classLoader);
+                    YsmRagdollLog.info("已找到 YSM 渲染器注册类: " + registry.getName());
+                    for (Method getter : registry.getDeclaredMethods()) {
+                        if (!Modifier.isStatic(getter.getModifiers())
+                                || getter.getParameterCount() != 0
+                                || !LivingEntityRenderer.class.isAssignableFrom(getter.getReturnType())) {
+                            continue;
+                        }
+                        getter.setAccessible(true);
+                        Object candidate = getter.invoke(null);
+                        Method playerRenderMethod = findPlayerRenderMethod(
+                                candidate == null ? null : candidate.getClass());
+                        if (candidate == null || playerRenderMethod == null) {
+                            continue;
+                        }
+                        ysmPlayerRenderer = candidate;
+                        ysmPlayerRenderMethod = playerRenderMethod;
+                        YsmRagdollLog.info("已找到 YSM 玩家渲染器: " + candidate.getClass().getName());
+                        YsmRagdollLog.info("已找到 YSM 首次捕获方法: "
+                                + playerRenderMethod.getDeclaringClass().getName()
+                                + "#" + playerRenderMethod.getName());
+                        return candidate;
+                    }
+                } catch (ClassNotFoundException ignored) {
+                    // The other supported distribution may provide this binding.
+                } catch (Throwable exception) {
+                    YsmRagdollLog.warn("读取 YSM 渲染器注册类失败: " + describe(exception));
+                }
             }
         }
         YsmRagdollLog.warn("未找到兼容的 YSM 玩家渲染器，静态尸体不会回退为原版模型");
@@ -436,42 +453,51 @@ public final class OpenYsmModelAdapter {
         if (ysmMeshRenderMethod != null) {
             return ysmMeshRenderMethod;
         }
-        for (ClassLoader classLoader : classLoaders()) {
-            if (classLoader == null) {
-                continue;
-            }
-            try {
-                Class<?> rendererClass = Class.forName(YSM_MESH_RENDERER, false, classLoader);
-                for (Method method : rendererClass.getDeclaredMethods()) {
-                    Class<?>[] parameters = method.getParameterTypes();
-                    if (Modifier.isStatic(method.getModifiers())
-                            && method.getReturnType() == void.class
-                            && parameters.length == 13
-                            && VertexConsumer.class.isAssignableFrom(parameters[0])
-                            && parameters[1] == PoseStack.Pose.class
-                            && parameters[2].isAssignableFrom(meshClass)
-                            && parameters[3] == float[].class
-                            && parameters[4] == float[].class
-                            && parameters[5] == int.class
-                            && parameters[6] == int.class
-                            && parameters[7] == int.class
-                            && parameters[8] == int.class
-                            && parameters[9] == float.class
-                            && parameters[10] == float.class
-                            && parameters[11] == float.class
-                            && parameters[12] == float.class) {
-                        method.setAccessible(true);
+        for (String rendererName : YsmPlatform.meshRenderers()) {
+            for (ClassLoader classLoader : classLoaders()) {
+                if (classLoader == null) {
+                    continue;
+                }
+                try {
+                    Class<?> rendererClass = Class.forName(rendererName, false, classLoader);
+                    Method method = findMeshRenderMethod(rendererClass, meshClass);
+                    if (method != null) {
                         ysmMeshRenderMethod = method;
                         YsmRagdollLog.info("已找到 YSM 独立网格重放方法: "
                                 + rendererClass.getName() + "#" + method.getName());
                         return method;
                     }
+                } catch (ClassNotFoundException ignored) {
+                    // The other supported distribution may provide this binding.
+                } catch (Throwable exception) {
+                    YsmRagdollLog.warn("读取 YSM 底层网格方法失败: " + describe(exception));
                 }
-            } catch (Throwable exception) {
-                YsmRagdollLog.warn("读取 YSM 底层网格方法失败: " + describe(exception));
             }
         }
         return null;
+    }
+
+    static Method findMeshRenderMethod(Class<?> rendererClass, Class<?> meshClass) {
+        Method legacy = null;
+        for (Method method : rendererClass.getDeclaredMethods()) {
+            Class<?>[] parameters = method.getParameterTypes();
+            if (Modifier.isStatic(method.getModifiers()) && method.getReturnType() == void.class
+                    && (parameters.length == 13 || parameters.length == 14)
+                    && VertexConsumer.class.isAssignableFrom(parameters[0])
+                    && parameters[1] == PoseStack.Pose.class
+                    && parameters[2].isAssignableFrom(meshClass)
+                    && parameters[3] == float[].class && parameters[4] == float[].class
+                    && parameters[5] == int.class && parameters[6] == int.class
+                    && parameters[7] == int.class && parameters[8] == int.class
+                    && parameters[9] == float.class && parameters[10] == float.class
+                    && parameters[11] == float.class && parameters[12] == float.class
+                    && (parameters.length == 13 || parameters[13] == ResourceLocation.class)) {
+                method.setAccessible(true);
+                if (parameters.length == 14) return method;
+                legacy = method;
+            }
+        }
+        return legacy;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -610,7 +636,8 @@ public final class OpenYsmModelAdapter {
     private record SnapshotDraft(Object mesh, float[] boneTransforms, float[] secondaryState,
                                  int textureIndex, int renderPartMask, int packedOverlay,
                                  float red, float green, float blue, float alpha,
-                                 Matrix4f relativePose, Matrix3f relativeNormal) {
+                                 Matrix4f relativePose, Matrix3f relativeNormal,
+                                 ResourceLocation texture) {
     }
 
     private record ModelSnapshot(Object mesh, float[] boneTransforms, float[] secondaryState,
