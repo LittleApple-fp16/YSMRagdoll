@@ -2,6 +2,7 @@ package com.ysmragdoll.client;
 
 import com.ysmragdoll.OpenYsmRagdollMod;
 import com.ysmragdoll.YsmRagdollLog;
+import com.ysmragdoll.config.YsmRagdollConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
@@ -24,6 +25,9 @@ public final class ClientRagdollEvents {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
+        if (!YsmRagdollConfig.SPEC.isLoaded()) {
+            return;
+        }
         GravityGunController.update(1.0F);
         ClientRagdollManager.tick();
         Minecraft minecraft = Minecraft.getInstance();
@@ -40,7 +44,8 @@ public final class ClientRagdollEvents {
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
+        if (!YsmRagdollConfig.SPEC.isLoaded()
+                || event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
             return;
         }
         long startedAt = System.nanoTime();
@@ -53,6 +58,9 @@ public final class ClientRagdollEvents {
 
     @SubscribeEvent
     public static void onUseItem(InputEvent.InteractionKeyMappingTriggered event) {
+        if (!YsmRagdollConfig.SPEC.isLoaded()) {
+            return;
+        }
         if (event.isUseItem() && GravityGunController.isArmed()) {
             if (event.getHand() == InteractionHand.MAIN_HAND) GravityGunController.start();
             event.setCanceled(true);
@@ -72,6 +80,9 @@ public final class ClientRagdollEvents {
 
     @SubscribeEvent
     public static void onMouseScroll(InputEvent.MouseScrollingEvent event) {
+        if (!YsmRagdollConfig.SPEC.isLoaded()) {
+            return;
+        }
         if (GravityGunController.scroll(event.getScrollDeltaY())) event.setCanceled(true);
     }
 

@@ -15,6 +15,11 @@ New release notes are generated from the matching version section. Historical da
 - 整理中英文首页，区分 Forge 正式版与三平台测试版下载，补全安装和文档导航。
 - 分离玩家指南与技术架构，统一开发、贡献和发布说明，移除重复历史笔记及本地诊断文件。
 
+## [0.5.28] - 2026-10-25
+
+- 修复 NeoForge 客户端启动时在配置加载完成前读取配置导致的崩溃。
+- 客户端更新、渲染和输入回调在配置就绪后开始处理。
+
 ## [0.5.27] - 2026-10-25
 
 - 新增 Minecraft 1.21.1 NeoForge 版本，使用 Java 21。
