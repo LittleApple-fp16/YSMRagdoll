@@ -214,7 +214,6 @@ public final class OpenYsmModelAdapter {
                 renderPartMask, packedLight, packedOverlay, red, green, blue, alpha, null);
     }
 
-    /** OpenYSM's textured entry point can bypass the legacy draw method entirely. */
     public static boolean onYsmMeshRender(PoseStack.Pose pose, Object mesh,
                                           float[] boneTransforms, float[] secondaryState,
                                           int textureIndex, int renderPartMask,
@@ -423,7 +422,7 @@ public final class OpenYsmModelAdapter {
                         return candidate;
                     }
                 } catch (ClassNotFoundException ignored) {
-                    // The other supported distribution may provide this binding.
+
                 } catch (Throwable exception) {
                     YsmRagdollLog.warn("读取 YSM 渲染器注册类失败: " + describe(exception));
                 }
@@ -472,7 +471,7 @@ public final class OpenYsmModelAdapter {
                         return method;
                     }
                 } catch (ClassNotFoundException ignored) {
-                    // The other supported distribution may provide this binding.
+
                 } catch (Throwable exception) {
                     YsmRagdollLog.warn("读取 YSM 底层网格方法失败: " + describe(exception));
                 }

@@ -11,7 +11,6 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** OpenYSM uses readable names and may submit directly through its textured overload. */
 @Pseudo
 @Mixin(targets = "com.elfmcys.yesstevemodel.geckolib3.geo.NativeModelRenderer", remap = false)
 abstract class OpenYsmMeshCaptureMixin {

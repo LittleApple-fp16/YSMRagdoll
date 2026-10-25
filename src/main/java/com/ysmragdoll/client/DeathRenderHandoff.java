@@ -4,7 +4,6 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Owns the visual replacement of an entity instance, independently of corpse lifetime. */
 final class DeathRenderHandoff<T> {
     private static final long DEATH_STATE_GRACE_MILLIS = 1000;
     private final List<Replacement<T>> replacements = new ArrayList<>();
@@ -23,8 +22,7 @@ final class DeathRenderHandoff<T> {
             replacement.sawDeath = true;
             return true;
         }
-        // The death snapshot can arrive before the health update. Allow a short
-        // handoff window, but never leave a revived or cancelled-death player hidden.
+
         if (replacement.sawDeath || now - replacement.createdAt >= DEATH_STATE_GRACE_MILLIS) {
             replacements.remove(replacement);
             return false;
@@ -42,8 +40,7 @@ final class DeathRenderHandoff<T> {
     }
 
     private Replacement<T> find(T entity) {
-        // Entity.equals can consider a respawn with the same entity ID equal to
-        // its predecessor. Match references explicitly, without keeping entities alive.
+
         for (int i = replacements.size() - 1; i >= 0; i--) {
             Replacement<T> replacement = replacements.get(i);
             T source = replacement.entity.get();

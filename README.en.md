@@ -17,13 +17,14 @@ The three-platform preview is `0.5.26-beta.1`; full in-game acceptance testing f
 
 | Version | Minecraft | Loader | Java | Download |
 | --- | --- | --- | --- | --- |
+| **0.5.27** | 1.21.1 | NeoForge 21.1.x | 21 | [NeoForge package](https://github.com/LittleApple-fp16/YSMRagdoll/releases) |
 | **0.5.26 Stable** | 1.20.1 | Forge 47.4.x | 17 | [Forge package](https://github.com/Esnowflake/YSMRagdoll/releases/download/0.5.26/ysmragdoll-0.5.26-all.jar) |
 | 0.5.26-beta.1 Beta | 1.20.1 | Forge 47.4.x | 17 | [Forge Beta](https://github.com/Esnowflake/YSMRagdoll/releases/download/v0.5.26-beta.1/ysmragdoll-0.5.26-beta.1%2Bmc1.20.1-forge-all.jar) |
 | 0.5.26-beta.1 Beta | 1.20.1 | Fabric Loader ≥ 0.16.14 | 17 | [Fabric 1.20.1 Beta](https://github.com/Esnowflake/YSMRagdoll/releases/download/v0.5.26-beta.1/ysmragdoll-0.5.26-beta.1%2Bmc1.20.1-fabric-all.jar) |
 | 0.5.26-beta.1 Beta | 1.21.1 | Fabric Loader ≥ 0.16.14 | 21 | [Fabric 1.21.1 Beta](https://github.com/Esnowflake/YSMRagdoll/releases/download/v0.5.26-beta.1/ysmragdoll-0.5.26-beta.1%2Bmc1.21.1-fabric-all.jar) |
 
 Clients need **YSM 2.6.5** for the matching Minecraft version and loader. Fabric also requires **Fabric API**.
-There are no Forge 1.21.1 or NeoForge packages.
+NeoForge 1.21.1 / Java 21 is available. Forge 1.21.1 is not supported.
 
 Download **`-all.jar`** and put it in `mods`; do not double-click it. Plain JARs and GitHub's Source code archives are not complete mod packages.
 See the [Beta release notes and SHA-256 checksums](https://github.com/Esnowflake/YSMRagdoll/releases/tag/v0.5.26-beta.1) to verify your download.

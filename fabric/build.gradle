@@ -86,7 +86,6 @@ sourceSets {
     test {
         java {
             srcDirs = ["${repositoryRoot}/src/test/java", 'src/test/java', "src/${minecraftVersion}/test"]
-            exclude '**/OpenYsmForgeBindingsTest.java'
             if (minecraftVersion == '1.21.1') {
                 exclude { e -> e.file.name == 'CaptureBufferTest.java' &&
                     e.file.toPath().startsWith(file("${repositoryRoot}/src/test/java").toPath()) }

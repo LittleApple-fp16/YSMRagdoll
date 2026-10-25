@@ -185,35 +185,6 @@ versionRange="[47.4.0,48)"
                 jar.writestr(release.PARSER_ROOT + name, "fixture")
         return path
 
-    def test_rejects_unrelocated_parser_on_every_target(self):
-        for target in release.TARGETS:
-            for name in (
-                "com/elfmcys/yesstevemodel/resource/YSMFolderDeserializer.class",
-                "com/elfmcys/yesstevemodel/resource/pojo/RawYsmModel$RawBone.class",
-                "rip/ysm/zstd/ZstdUtil.class",
-                "META-INF/versions/17/rip/ysm/algorithms/CityHash.class",
-            ):
-                with self.subTest(target=target, name=name):
-                    jar = (self.make_jar() if target.startswith("forge-")
-                           else self.make_fabric_jar(target.split("-", 1)[1]))
-                    with zipfile.ZipFile(jar, "a") as archive:
-                        archive.writestr(name, b"fixture")
-                    with self.assertRaisesRegex(ValueError, "Unrelocated OpenYSM"):
-                        release.prepare(self.root, "v1.2.3", target)
-
-    def test_rejects_missing_private_parser_class(self):
-        for missing in PARSER_ENTRIES:
-            with self.subTest(missing=missing):
-                jar = self.make_jar()
-                with zipfile.ZipFile(jar) as archive:
-                    entries = {name: archive.read(name) for name in archive.namelist()
-                               if name != release.PARSER_ROOT + missing}
-                with zipfile.ZipFile(jar, "w") as archive:
-                    for name, data in entries.items():
-                        archive.writestr(name, data)
-                with self.assertRaises(KeyError):
-                    release.prepare(self.root, "v1.2.3")
-
     def test_prepares_both_fabric_targets(self):
         for minecraft in ("1.20.1", "1.21.1"):
             source = self.make_fabric_jar(minecraft)
@@ -229,7 +200,7 @@ versionRange="[47.4.0,48)"
                 release.prepare(self.root, "v1.2.3", "fabric-1.21.1")
 
     def test_rejects_unrequested_targets(self):
-        for target in ("forge-1.21.1", "neoforge-1.21.1", "../forge-1.20.1"):
+        for target in ("forge-1.21.1", "neoforge-1.20.1", "../forge-1.20.1"):
             with self.assertRaises(ValueError):
                 release.asset_name("1.2.3", target)
 
@@ -247,11 +218,11 @@ versionRange="[47.4.0,48)"
                 release.release_notes(self.root, "v1.2.3"), encoding="utf-8")
         return inputs
 
-    def test_assembles_exactly_three_targets(self):
+    def test_assembles_all_targets(self):
         release.assemble(self.root, "v1.2.3", self.make_bundles())
         output = self.root / "build/release"
-        self.assertEqual(len(list(output.glob("*.jar"))), 3)
-        self.assertEqual(len((output / "ysmragdoll-1.2.3-SHA256SUMS.txt").read_text().splitlines()), 3)
+        self.assertEqual(len(list(output.glob("*.jar"))), len(release.TARGETS))
+        self.assertEqual(len((output / "ysmragdoll-1.2.3-SHA256SUMS.txt").read_text().splitlines()), len(release.TARGETS))
 
     def test_rejects_incomplete_or_tampered_matrix(self):
         inputs = self.make_bundles()

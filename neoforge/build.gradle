@@ -1,0 +1,79 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+def repositoryRoot = rootDir.parentFile
+def shared = new Properties()
+file("${repositoryRoot}/gradle.properties").withInputStream { shared.load(it) }
+group = shared.mod_group_id
+version = findProperty('mod_version') ?: shared.mod_version
+base.archivesName = 'ysmragdoll-1.21.1-neoforge'
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories { mavenCentral() }
+neoForge {
+    enable {
+        version = '21.1.264'
+        disableRecompilation = true
+    }
+    runs {
+        client { client() }
+        server { server(); programArgument '--nogui' }
+    }
+    mods {
+        ysmragdoll { sourceSet(sourceSets.main) }
+    }
+}
+
+ext.openYsmJar = file(findProperty('openysm_jar')
+        ?: "${repositoryRoot}/libs/openysm-2.6.5-forge+mc1.20.1.jar")
+if (!openYsmJar.isFile()) throw new GradleException("Missing parser dependency: ${openYsmJar}")
+
+dependencies {
+    jarJar(implementation('cz.advel.jbullet:jbullet:20101010-1')) { transitive = false }
+    jarJar(implementation('javax.vecmath:vecmath:1.5.2'))
+    additionalRuntimeClasspath('cz.advel.jbullet:jbullet:20101010-1') { transitive = false }
+    additionalRuntimeClasspath 'javax.vecmath:vecmath:1.5.2'
+}
+
+def sharedJava = file("${repositoryRoot}/src/main/java")
+def platformFiles = [
+    'OpenYsmRagdollMod.java', 'ClientBootstrap.java', 'ClientRagdollEvents.java',
+    'RagdollKeyMappings.java', 'RagdollNetwork.java', 'PlayerDeathSnapshot.java',
+    'ExplosionImpulseSnapshot.java', 'ServerDeathEvents.java', 'ServerExplosionEvents.java',
+    'YsmPlatform.java', 'YsmRagdollConfig.java', 'Ysm265MeshCaptureMixin.java',
+    'OpenYsmMeshCaptureMixin.java', 'OpenYsmPlayerRenderMixin.java',
+    'DeathRenderHandoffMixin.java', 'ClientVersion.java', 'DiscardingVertexConsumer.java',
+    'VersionedScreen.java'
+]
+sourceSets {
+    main {
+        java {
+            srcDirs = [sharedJava, 'src/main/java']
+            exclude { e -> e.file.toPath().startsWith(sharedJava.toPath()) && platformFiles.contains(e.file.name) }
+        }
+        resources {
+            srcDirs = ["${repositoryRoot}/src/main/resources", 'src/main/resources']
+            exclude 'META-INF/mods.toml', 'ysmragdoll.mixins.json'
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+apply from: "${repositoryRoot}/gradle/openysm-runtime.gradle"
+processResources {
+    inputs.property 'modVersion', project.version
+    filesMatching('META-INF/neoforge.mods.toml') { expand modVersion: project.version }
+    from("${repositoryRoot}/LICENSE") { into 'META-INF/licenses'; rename { 'YSMRAGDOLL-LICENSE.txt' } }
+    from("${repositoryRoot}/licenses/OpenYSM-LICENSE.txt") { into 'META-INF/licenses'; rename { 'OpenYSM-LICENSE.txt' } }
+    doLast {
+        def pack = new groovy.json.JsonSlurper().parse(file("${destinationDir}/pack.mcmeta"))
+        pack.pack.pack_format = 34
+        file("${destinationDir}/pack.mcmeta").text = groovy.json.JsonOutput.toJson(pack)
+    }
+}
+jar {
+    archiveClassifier = 'all'
+    manifest.attributes 'Implementation-Version': project.version
+}

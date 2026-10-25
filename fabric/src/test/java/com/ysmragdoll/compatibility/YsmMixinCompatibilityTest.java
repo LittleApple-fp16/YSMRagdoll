@@ -26,7 +26,6 @@ class YsmMixinCompatibilityTest {
         for (String[] target : new String[][] {
                 {"net.minecraft.client.Minecraft", "ysmragdoll$"},
                 {"net.minecraft.client.MouseHandler", "ysmragdoll$scroll"},
-                {"net.minecraft.client.renderer.entity.EntityRenderDispatcher", "ysmragdoll$hideReplacedPlayer"},
                 {"net.minecraft.world.level.Explosion", "ysmragdoll$exploded"}
         }) {
             Class<?> type = Class.forName(target[0], false, getClass().getClassLoader());

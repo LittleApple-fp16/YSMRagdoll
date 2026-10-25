@@ -8,6 +8,7 @@ jars=(
   "ysmragdoll-${version}+mc1.20.1-forge-all.jar"
   "ysmragdoll-${version}+mc1.20.1-fabric-all.jar"
   "ysmragdoll-${version}+mc1.21.1-fabric-all.jar"
+  "ysmragdoll-${version}+mc1.21.1-neoforge-all.jar"
 )
 checksum="ysmragdoll-${version}-SHA256SUMS.txt"
 

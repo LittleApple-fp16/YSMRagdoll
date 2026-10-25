@@ -15,7 +15,7 @@ VERSION = re.compile(
     r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:alpha|beta|rc)\.[1-9]\d*)?",
     re.ASCII,
 )
-TARGETS = ("forge-1.20.1", "fabric-1.20.1", "fabric-1.21.1")
+TARGETS = ("forge-1.20.1", "fabric-1.20.1", "fabric-1.21.1", "neoforge-1.21.1")
 PARSER_ROOT = "com/ysmragdoll/internal/openysm/"
 
 
@@ -77,7 +77,7 @@ def release_notes(root, tag):
         raise ValueError("Release changelog must contain at least one change")
     return (
         f"# YSM Ragdoll {version}\n\n"
-        "Forge 1.20.1 / Java 17 | Fabric 1.20.1 / Java 17 | Fabric 1.21.1 / Java 21\n\n"
+        "Forge 1.20.1 / Java 17 | Fabric 1.20.1 / Java 17 | Fabric 1.21.1 / Java 21 | NeoForge 1.21.1 / Java 21\n\n"
         f"{body}\n\n"
         "## Installation / 安装\n\n"
         "Install the `-all.jar`, not the plain JAR or source archive. "
@@ -85,7 +85,7 @@ def release_notes(root, tag):
         "Choose the JAR matching your Minecraft version and loader. Fabric requires Fabric API. "
         "YSM compatibility target: 2.6.5. "
         "Build checks do not replace in-game testing.\n\n"
-        "To verify the complete download, place all three JARs and the checksum file together:\n\n"
+        "To verify the complete download, place all four JARs and the checksum file together:\n\n"
         f"```sh\nsha256sum --check ysmragdoll-{version}-SHA256SUMS.txt\n```\n"
     )
 
@@ -94,6 +94,11 @@ def prepare(root, tag, target="forge-1.20.1"):
     notes = release_notes(root, tag)
     version = tag[1:]
     filename = asset_name(version, target)
+    if target == "neoforge-1.21.1":
+        jar = root / "neoforge" / "build" / "libs" / f"ysmragdoll-1.21.1-neoforge-{version}-all.jar"
+        verify_neoforge(jar, version)
+        write_bundle(root, jar, filename, version, notes)
+        return
     if target.startswith("fabric-"):
         minecraft = target.split("-", 1)[1]
         jar = root / "fabric" / "build" / minecraft / "libs" / f"ysmragdoll-{minecraft}-fabric-{version}-all.jar"
@@ -163,6 +168,39 @@ def prepare(root, tag, target="forge-1.20.1"):
                 "OpenYsmPlayerRenderMixin"} <= set(mixin.get("client", [])):
             raise ValueError("Missing YSM capture mixin")
     write_bundle(root, jar, filename, version, notes)
+
+
+def verify_neoforge(jar, version):
+    with zipfile.ZipFile(jar) as archive:
+        if archive.testzip():
+            raise ValueError("Corrupt NeoForge JAR")
+        verify_parser_isolation(archive)
+        metadata = tomllib.loads(archive.read("META-INF/neoforge.mods.toml").decode("utf-8"))
+        mods = metadata.get("mods", [])
+        if len(mods) != 1 or mods[0].get("modId") != "ysmragdoll" or mods[0].get("version") != version:
+            raise ValueError("NeoForge mod metadata mismatch")
+        dependencies = {d["modId"]: d for d in metadata.get("dependencies", {}).get("ysmragdoll", [])}
+        if dependencies.get("minecraft", {}).get("versionRange") != "[1.21.1]":
+            raise ValueError("NeoForge Minecraft version mismatch")
+        if dependencies.get("neoforge", {}).get("versionRange") != "[21.1.0,21.2)":
+            raise ValueError("NeoForge loader version mismatch")
+        config = json.loads(archive.read("ysmragdoll.neoforge.mixins.json"))
+        if set(config.get("client", [])) != {"Ysm265MeshCaptureMixin", "DeathRenderHandoffMixin", "YsmPlayerRenderMixin"}:
+            raise ValueError("NeoForge client mixin mismatch")
+        if config.get("mixins") != ["ExplosionMixin"]:
+            raise ValueError("NeoForge common mixin mismatch")
+        expected = {("cz.advel.jbullet", "jbullet"), ("javax.vecmath", "vecmath")}
+        libraries = json.loads(archive.read("META-INF/jarjar/metadata.json"))["jars"]
+        found = {(entry["identifier"]["group"], entry["identifier"]["artifact"]) for entry in libraries}
+        if found != expected or len(libraries) != 2:
+            raise ValueError("NeoForge bundled dependency mismatch")
+        for entry in libraries:
+            with zipfile.ZipFile(BytesIO(archive.read(entry["path"]))) as nested:
+                if nested.testzip():
+                    raise ValueError("Corrupt NeoForge nested dependency")
+        for name in ("YSMRAGDOLL-LICENSE.txt", "OpenYSM-LICENSE.txt"):
+            if not archive.read("META-INF/licenses/" + name):
+                raise ValueError("Missing license")
 
 
 def verify_fabric(jar, version, minecraft):

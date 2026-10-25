@@ -16,13 +16,14 @@ YSM Ragdoll 是面向 Yes Steve Model（YSM）的 Minecraft 模组。它保留�
 
 | 版本 | Minecraft | 加载器 | Java | 下载 |
 | --- | --- | --- | --- | --- |
+| **0.5.27** | 1.21.1 | NeoForge 21.1.x | 21 | [NeoForge 安装包](https://github.com/LittleApple-fp16/YSMRagdoll/releases) |
 | **0.5.26 正式版** | 1.20.1 | Forge 47.4.x | 17 | [Forge 安装包](https://github.com/Esnowflake/YSMRagdoll/releases/download/0.5.26/ysmragdoll-0.5.26-all.jar) |
 | 0.5.26-beta.1 测试版 | 1.20.1 | Forge 47.4.x | 17 | [Forge Beta](https://github.com/Esnowflake/YSMRagdoll/releases/download/v0.5.26-beta.1/ysmragdoll-0.5.26-beta.1%2Bmc1.20.1-forge-all.jar) |
 | 0.5.26-beta.1 测试版 | 1.20.1 | Fabric Loader ≥ 0.16.14 | 17 | [Fabric 1.20.1 Beta](https://github.com/Esnowflake/YSMRagdoll/releases/download/v0.5.26-beta.1/ysmragdoll-0.5.26-beta.1%2Bmc1.20.1-fabric-all.jar) |
 | 0.5.26-beta.1 测试版 | 1.21.1 | Fabric Loader ≥ 0.16.14 | 21 | [Fabric 1.21.1 Beta](https://github.com/Esnowflake/YSMRagdoll/releases/download/v0.5.26-beta.1/ysmragdoll-0.5.26-beta.1%2Bmc1.21.1-fabric-all.jar) |
 
 客户端需安装与游戏版本、加载器匹配的 **YSM 2.6.5**，Fabric 还需 **Fabric API**。
-目前没有 Forge 1.21.1 或 NeoForge 安装包。
+新增 NeoForge 1.21.1 / Java 21 安装包；目前不提供 Forge 1.21.1 版本。
 
 请下载 **`-all.jar`**，放入 `mods` 文件夹，无需双击运行。普通 JAR 和 GitHub 自动提供的 Source code 压缩包不能作为完整模组安装包。
 [测试版发行说明与 SHA-256 校验文件](https://github.com/Esnowflake/YSMRagdoll/releases/tag/v0.5.26-beta.1)可用于核对下载内容。
@@ -49,7 +50,7 @@ YSM Ragdoll 是面向 Yes Steve Model（YSM）的 Minecraft 模组。它保留�
 ## 文档与贡献
 
 - [使用与故障排查](docs/GUIDE.zh-CN.md)：设置、牵引、日志和常见问题。
-- [开发与构建](docs/BUILDING.md)：开发环境、三平台构建及测试。
+- [开发与构建](docs/BUILDING.md)：开发环境、四平台构建及测试。
 - [贡献指南](CONTRIBUTING.md)：问题反馈、分支与 Pull Request。
 - [发布流程](docs/RELEASING.md)：版本、标签、构建校验与发行草稿。
 - [文档索引](docs/README.md)：技术说明与其他参考资料。

@@ -57,7 +57,6 @@ public final class ClientRagdollManager {
         return RAGDOLLS.size();
     }
 
-    /** Called by normal entity rendering and OpenYSM's direct player-render path. */
     public static boolean shouldHideReplacedPlayer(Player player) {
         return DEATH_RENDER_HANDOFF.shouldHide(player, player.isDeadOrDying(),
                 OpenYsmModelAdapter.isCapturing(), System.currentTimeMillis());
@@ -264,8 +263,7 @@ public final class ClientRagdollManager {
         }
         boolean complete = false;
         if (pending.ageTicks % CAPTURE_RETRY_INTERVAL_TICKS == 0) {
-            // A respawn may reuse the UUID or entity ID. Only retry the instance
-            // that died; the replacement player must never supply or inherit its corpse.
+
             Player carrier = pending.player;
             complete = carrier != null && OpenYsmModelAdapter.retryCapture(pending.model, carrier,
                     pending.snapshot.x(), pending.snapshot.y(), pending.snapshot.z(),

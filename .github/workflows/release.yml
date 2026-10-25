@@ -38,6 +38,10 @@ jobs:
             java: "21"
             args: "--project-dir fabric -Ptarget_mc=1.21.1 -Pysm_smoke=true"
             output: fabric/build/1.21.1
+          - target: neoforge-1.21.1
+            java: "21"
+            args: "--project-dir neoforge"
+            output: neoforge/build
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

@@ -43,7 +43,7 @@ public final class YsmPlatform {
                     return player.getCapability(capability).resolve().orElse(null);
                 }
             } catch (ClassNotFoundException | NoSuchFieldException ignored) {
-                // Official YSM and OpenYSM use different names for the same state.
+
             }
         }
         return null;

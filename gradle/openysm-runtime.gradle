@@ -8,8 +8,6 @@ buildscript {
     dependencies { classpath 'org.ow2.asm:asm-commons:9.7.1' }
 }
 
-// Share the same private parser on Forge and Fabric, including development runs.
-// Relocate before compilation so no consumer can accidentally bind to YSM's copy.
 def runtimeDir = layout.buildDirectory.dir('generated/openysmRuntime')
 def namespaces = [
         'com/elfmcys/yesstevemodel/': 'com/ysmragdoll/internal/openysm/',

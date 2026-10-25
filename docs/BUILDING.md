@@ -14,6 +14,7 @@
 | Forge 1.20.1 | 仓库根目录 | 17 | `build/libs/` |
 | Fabric 1.20.1 | `fabric/`，`target_mc=1.20.1` | 17 | `fabric/build/1.20.1/libs/` |
 | Fabric 1.21.1 | `fabric/`，`target_mc=1.21.1` | 21 | `fabric/build/1.21.1/libs/` |
+| NeoForge 1.21.1 | `neoforge/` | 21 | `neoforge/build/libs/` |
 
 以下命令均从仓库根目录执行。请确认 `JAVA_HOME` 指向自己的 JDK 21 安装目录；
 JDK 17 应能被 Gradle toolchain 发现，必要时用
@@ -21,11 +22,7 @@ JDK 17 应能被 Gradle toolchain 发现，必要时用
 
 ## 准备 OpenYSM 编译依赖 / Parser dependency
 
-三个目标共享以下固定依赖。构建只提取所需解析类并保留许可，不将完整 OpenYSM 模组打入发行包。
-`gradle/openysm-runtime.gradle` 在编译前将解析器、解密与 Zstd 类的字节码引用统一重定位到
-`com.ysmragdoll.internal.openysm`；自有动画类型映射也位于该私有包。
-编译、开发运行和发行包均使用隔离后的类，避免与 YSM 本体发生 Java 模块拆分包冲突。
-`check` 会检查输出中没有原始 `com.elfmcys.yesstevemodel` 或 `rip.ysm` 包；发布脚本另行检查成品。
+四个目标共享以下固定依赖。构建只提取所需解析类并保留许可，不将完整 OpenYSM 模组打入发行包。
 下载地址和 SHA-256 与 CI 固定值一致，依赖保存在 Git 忽略的 `libs/` 中。
 
 PowerShell：
@@ -72,7 +69,7 @@ bash ./gradlew --no-daemon --project-dir fabric -Ptarget_mc=1.20.1 clean build
 bash ./gradlew --no-daemon --project-dir fabric -Ptarget_mc=1.21.1 clean build
 ```
 
-`build` 包含单元测试。测试报告位于各目标输出目录上一级的 `reports/tests/test/index.html`。
+原有 Forge、Fabric 构建保留单元测试，报告位于相应输出目录的 `reports/tests/test/index.html`。
 安装测试使用 `*-all.jar`；普通 JAR 不包含完整运行依赖。
 正式发行附件由发布工作流添加 Minecraft 和加载器标识，见[发布流程](RELEASING.md)。
 
@@ -90,24 +87,11 @@ bash ./gradlew --no-daemon --project-dir fabric -Ptarget_mc=1.21.1 -Pysm_smoke=t
 下载文件仅用于兼容性测试，保存在忽略的 `libs/compatibility/`，不随本模组分发。
 注入检查不启动游戏，不能证明模型选择、世界渲染、死亡流程和多人游戏均正常。
 
-## Forge OpenYSM 绑定检查 / OpenYSM bindings
-
-Forge 同时支持官方 YSM 2.6.5 的混淆绑定和 OpenYSM 的可读绑定。
-可用本地 OpenYSM 2.6.6.6 JAR 检查渲染器注册器、玩家状态和实际网格调用是否与捕获钩子匹配：
-
-```powershell
-.\build.ps1 --project-prop ysm_compatibility_jar=测试文件/openysm-forge-2.6.6.6.jar test
-```
-
-该 JAR 仅作为测试输入读取，不加入编译依赖或发行包。
-未指定该属性时跳过二进制绑定检查；共享测试仍检查骨骼数组冻结、纹理保留和快照重放。
-这些检查不启动游戏，不能代替安装后验证死亡生成。
-
 ## 发布脚本检查 / Release tooling
 
 ```sh
 python -m unittest discover -s scripts -p 'test_*.py'
-python scripts/release.py validate v0.5.26-beta.1
+python scripts/release.py validate v0.5.27
 ```
 
 示例标签对应当前 `gradle.properties` 的 `mod_version`；修改版本后同步替换标签，
@@ -124,7 +108,7 @@ Linux / macOS 如需将缓存放在项目内，可在构建前设置 `GRADLE_USE
 Java 的依赖下载需通过 `GRADLE_OPTS` 或本地 Gradle 配置设置 HTTP/HTTPS 代理；
 仅设置 `HTTPS_PROXY` 不保证 Java 使用该代理。
 
-IDE 分别导入根目录 Forge 工程和 `fabric/` 工程，选择 Wrapper 与 JDK 21 作为 Gradle JVM。
+IDE 分别导入根目录 Forge 工程、`fabric/` 和 `neoforge/` 工程，选择 Wrapper 与 JDK 21 作为 Gradle JVM。
 IDE 不一定调用 `build.ps1`，请单独配置缓存、代理和 JDK 17 toolchain。
 不要提交 IDE 个人状态或本机绝对路径。
 
@@ -138,7 +122,7 @@ IDE 不一定调用 `build.ps1`，请单独配置缓存、代理和 JDK 17 toolc
 
 Install JDK 21 and 17, run Gradle on JDK 21, and make JDK 17 discoverable as a toolchain.
 Run all commands from the repository root. Download and verify the pinned OpenYSM dependency above,
-then use the PowerShell or Bash build commands for the three targets.
+then use the PowerShell or Bash build commands for the four targets.
 
 Use `*-all.jar` from each target's output directory. Fabric injection checks additionally require the
 official test-only YSM binaries downloaded by `scripts/download-ysm.sh`. Python 3.11+ is required for
@@ -147,3 +131,13 @@ release tooling. Build and injection checks do not replace in-game testing.
 For proxy configuration, `build.ps1` reads environment settings before the Windows system proxy.
 Dependency download commands and IDE builds may need separate configuration.
 See [Releasing](RELEASING.md) for tags, package verification and release drafts.
+
+## NeoForge 1.21.1
+
+使用 Java 21，在仓库根目录执行：
+
+```sh
+bash ./gradlew --no-daemon --project-dir neoforge build
+```
+
+完整安装包位于 `neoforge/build/libs/ysmragdoll-1.21.1-neoforge-0.5.27-all.jar`。

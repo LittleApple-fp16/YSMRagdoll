@@ -32,7 +32,7 @@ Fork 用户同步时从自己的 `upstream/main` 获取更新；不要强推共�
 
 ## 提交前检查
 
-- 按[构建指南](docs/BUILDING.md)验证受影响的平台；共享物理或渲染改动应覆盖全部三个目标。
+- 按[构建指南](docs/BUILDING.md)验证受影响的平台；共享物理或渲染改动应覆盖全部四个目标。
 - 单元测试和 Mixin 注入检查不能替代游戏内验证。说明已测试的模型、单人/多人场景及尚未验证的部分。
 - 文档改动检查相对链接、版本和命令；调整首页时同步更新中英文 README。
 - 用户可见变化写入 [CHANGELOG.md](CHANGELOG.md) 的 `[Unreleased]`；不要自行移动已发布标签。
@@ -57,7 +57,7 @@ External contributors can fork; collaborators can use a feature branch in this r
 against `main` describing the problem, changes and verification. Do not force-push shared branches.
 
 Follow the [build guide](docs/BUILDING.md) and test affected platforms. Shared physics or rendering changes
-should cover all three targets. Report in-game testing separately from unit and injection checks.
+should cover all four targets. Report in-game testing separately from unit and injection checks.
 Keep both READMEs aligned, verify documentation links, and record user-visible changes under `[Unreleased]`.
 
 Keep logs, local notes, dependencies, player assets and credentials out of commits. Use ignored `local-notes/`

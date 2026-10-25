@@ -10,7 +10,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** OpenYSM can also draw the local player directly, outside EntityRenderDispatcher. */
 @Pseudo
 @Mixin(targets = "com.elfmcys.yesstevemodel.client.renderer.CustomPlayerRenderer", remap = false)
 abstract class OpenYsmPlayerRenderMixin {
