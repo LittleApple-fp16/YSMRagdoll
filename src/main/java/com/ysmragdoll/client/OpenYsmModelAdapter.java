@@ -52,6 +52,10 @@ public final class OpenYsmModelAdapter {
     private OpenYsmModelAdapter() {
     }
 
+    public static boolean isCapturing() {
+        return ACTIVE_CAPTURE.get() != null;
+    }
+
     public static Optional<CapturedModel> capture(Player player, double x, double y, double z, float yaw) {
         if (!YsmPlatform.loaded()) {
             YsmRagdollLog.warn("未加载 yes_steve_model，无法捕获死亡模型");

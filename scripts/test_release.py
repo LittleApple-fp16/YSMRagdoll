@@ -92,11 +92,15 @@ versionRange="[47.4.0,48)"
                 "com/ysmragdoll/OpenYsmRagdollMod.class",
                 "com/ysmragdoll/mixin/Ysm265MeshCaptureMixin.class",
                 "com/ysmragdoll/mixin/OpenYsmMeshCaptureMixin.class",
+                "com/ysmragdoll/mixin/DeathRenderHandoffMixin.class",
+                "com/ysmragdoll/mixin/OpenYsmPlayerRenderMixin.class",
             ):
                 jar.writestr(required, "fixture")
             for name in PARSER_ENTRIES:
                 jar.writestr(release.PARSER_ROOT + name, "fixture")
-            jar.writestr("ysmragdoll.mixins.json", '{"client":["Ysm265MeshCaptureMixin","OpenYsmMeshCaptureMixin"]}')
+            jar.writestr("ysmragdoll.mixins.json", json.dumps({"client": [
+                "Ysm265MeshCaptureMixin", "OpenYsmMeshCaptureMixin", "DeathRenderHandoffMixin",
+                "OpenYsmPlayerRenderMixin"]}))
         return path
 
     def test_prepares_flat_checksum_and_matching_bytes(self):
@@ -167,11 +171,12 @@ versionRange="[47.4.0,48)"
                     jar.writestr(nested_path, buffer.getvalue())
                     metadata["jars"].append({"file": nested_path})
             jar.writestr("fabric.mod.json", json.dumps(metadata))
-            jar.writestr("ysmragdoll.fabric.mixins.json", '{"client":["Ysm265MeshCaptureMixin"]}')
+            jar.writestr("ysmragdoll.fabric.mixins.json", '{"client":["Ysm265MeshCaptureMixin","DeathRenderHandoffMixin"]}')
             for name in (
                 "META-INF/licenses/YSMRAGDOLL-LICENSE.txt", "META-INF/licenses/OpenYSM-LICENSE.txt",
                 "com/ysmragdoll/OpenYsmRagdollMod.class",
                 "com/ysmragdoll/client/ClientBootstrap.class",
+                "com/ysmragdoll/mixin/DeathRenderHandoffMixin.class",
                 "com/ysmragdoll/mixin/Ysm265MeshCaptureMixin.class",
                 "ysmragdoll-platform.properties", "ysmragdoll.refmap.json",
             ):

@@ -98,6 +98,51 @@ class OpenYsmForgeBindingsTest {
         return new ZipFile(Path.of(System.getProperty("ysmragdoll.openysmJar")).toFile());
     }
 
+    @Test
+    void deathHandoffCoversMinecraftAndOpenYsmDirectRendering() throws Exception {
+        var dispatcher = read(getClass().getResourceAsStream(
+                "/net/minecraft/client/renderer/entity/EntityRenderDispatcher.class"));
+        var dispatcherMixin = read(getClass().getResourceAsStream(
+                "/com/ysmragdoll/mixin/DeathRenderHandoffMixin.class"));
+        Set<String> dispatcherSelectors = selectors(dispatcherMixin);
+        assertTrue(dispatcher.methods.stream().anyMatch(m -> dispatcherSelectors.contains(m.name + m.desc)),
+                "Minecraft's entity dispatcher must have a matching render entry");
+        assertTrue(dispatcherSelectors.stream().anyMatch(s -> s.startsWith("m_114384_(")),
+                "Forge production must use the verified 1.20.1 SRG render name");
+        try (var jar = input()) {
+            var playerRenderer = read(jar.getInputStream(jar.getEntry(
+                    "com/elfmcys/yesstevemodel/client/renderer/CustomPlayerRenderer.class")));
+            var playerMixin = read(getClass().getResourceAsStream(
+                    "/com/ysmragdoll/mixin/OpenYsmPlayerRenderMixin.class"));
+            Set<String> playerSelectors = selectors(playerMixin);
+            assertEquals(1, playerSelectors.size());
+            assertTrue(playerRenderer.methods.stream().anyMatch(m -> playerSelectors.contains(m.name + m.desc)),
+                    "OpenYSM's direct/first-person renderer must also support the handoff");
+        }
+        try (var config = getClass().getResourceAsStream("/ysmragdoll.mixins.json")) {
+            String json = new String(config.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(json.contains("DeathRenderHandoffMixin"));
+            assertTrue(json.contains("OpenYsmPlayerRenderMixin"));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Set<String> selectors(ClassNode mixin) {
+        Set<String> result = new HashSet<>();
+        for (var method : mixin.methods) {
+            if (method.visibleAnnotations == null) continue;
+            for (var annotation : method.visibleAnnotations) {
+                if (!annotation.desc.equals("Lorg/spongepowered/asm/mixin/injection/Inject;")) continue;
+                for (int i = 0; i < annotation.values.size(); i += 2) {
+                    if (annotation.values.get(i).equals("method")) {
+                        result.addAll((List<String>) annotation.values.get(i + 1));
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
     private static ClassNode read(InputStream input) throws Exception {
         assertNotNull(input, "Required class must be present");
         try (input) {

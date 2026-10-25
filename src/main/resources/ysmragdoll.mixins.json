@@ -5,7 +5,9 @@
   "compatibilityLevel": "JAVA_17",
   "client": [
     "Ysm265MeshCaptureMixin",
-    "OpenYsmMeshCaptureMixin"
+    "OpenYsmMeshCaptureMixin",
+    "DeathRenderHandoffMixin",
+    "OpenYsmPlayerRenderMixin"
   ],
   "injectors": {
     "defaultRequire": 0

@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.lang.ref.WeakReference;
 
 /**
  * 管理独立模型快照及其客户端物理生命周期。
@@ -38,6 +39,7 @@ import java.util.Map;
 public final class ClientRagdollManager {
     private static final Deque<StaticRagdoll> RAGDOLLS = new ArrayDeque<>();
     private static final Deque<PendingRagdoll> PENDING = new ArrayDeque<>();
+    private static final DeathRenderHandoff<Player> DEATH_RENDER_HANDOFF = new DeathRenderHandoff<>();
     private static final Map<String, Long> RECENT_DEATHS = new HashMap<>();
     private static final long DEATH_DEDUPLICATION_WINDOW_MILLIS = 1500L;
     private static final int MAX_CAPTURE_RETRIES = 40;
@@ -53,6 +55,12 @@ public final class ClientRagdollManager {
 
     public static int ragdollCount() {
         return RAGDOLLS.size();
+    }
+
+    /** Called by normal entity rendering and OpenYSM's direct player-render path. */
+    public static boolean shouldHideReplacedPlayer(Player player) {
+        return DEATH_RENDER_HANDOFF.shouldHide(player, player.isDeadOrDying(),
+                OpenYsmModelAdapter.isCapturing(), System.currentTimeMillis());
     }
 
     /** Read-only, client-thread view of the same deadlines used for removal. */
@@ -256,13 +264,9 @@ public final class ClientRagdollManager {
         }
         boolean complete = false;
         if (pending.ageTicks % CAPTURE_RETRY_INTERVAL_TICKS == 0) {
+            // A respawn may reuse the UUID or entity ID. Only retry the instance
+            // that died; the replacement player must never supply or inherit its corpse.
             Player carrier = pending.player;
-            if (carrier == null || !carrier.isAlive()) {
-                Entity entity = minecraft.level.getEntity(pending.snapshot.entityId());
-                carrier = entity instanceof Player found ? found
-                        : minecraft.level.getPlayerByUUID(pending.snapshot.playerId());
-                pending.player = carrier;
-            }
             complete = carrier != null && OpenYsmModelAdapter.retryCapture(pending.model, carrier,
                     pending.snapshot.x(), pending.snapshot.y(), pending.snapshot.z(),
                     pending.snapshot.bodyYaw());
@@ -279,8 +283,13 @@ public final class ClientRagdollManager {
             return null;
         }
         trimForNewRagdoll();
-        StaticRagdoll ragdoll = new StaticRagdoll(pending.snapshot, pending.model, pending.createdAtMillis);
+        StaticRagdoll ragdoll = new StaticRagdoll(pending.snapshot, pending.model,
+                pending.createdAtMillis, pending.player);
         RAGDOLLS.addLast(ragdoll);
+        if (pending.player != null) {
+            DEATH_RENDER_HANDOFF.replace(pending.player, ragdoll.id,
+                    pending.player.isDeadOrDying(), System.currentTimeMillis());
+        }
         YsmRagdollLog.info("创建布娃娃快照: 玩家=" + pending.snapshot.playerId()
                 + ", 位置=" + pending.snapshot.x() + "," + pending.snapshot.y()
                 + "," + pending.snapshot.z());
@@ -310,6 +319,7 @@ public final class ClientRagdollManager {
         }
         RAGDOLLS.clear();
         PENDING.clear();
+        DEATH_RENDER_HANDOFF.clear();
         RECENT_DEATHS.clear();
         RECENT_EXPLOSIONS.clear();
         releaseWorldIfUnused();
@@ -399,8 +409,10 @@ public final class ClientRagdollManager {
                     : ragdoll.physics.center().add(0.0, 0.65, 0.0);
             int light = LevelRenderer.getLightColor(minecraft.level,
                     BlockPos.containing(lightSample));
-            OpenYsmModelAdapter.render(ragdoll.model(), snapshot.x(), snapshot.y(), snapshot.z(),
-                    snapshot.bodyYaw(), partialTick, poseStack, buffers, light);
+            if (!OpenYsmModelAdapter.render(ragdoll.model(), snapshot.x(), snapshot.y(), snapshot.z(),
+                    snapshot.bodyYaw(), partialTick, poseStack, buffers, light)) {
+                DEATH_RENDER_HANDOFF.release(ragdoll.sourcePlayer.get(), ragdoll.id);
+            }
             poseStack.popPose();
             if (debugLines != null && ragdoll.physics != null) {
                 ragdoll.physics.renderDebug(poseStack, camera, debugLines);
@@ -481,15 +493,17 @@ public final class ClientRagdollManager {
         private final PlayerDeathSnapshot snapshot;
         private final OpenYsmModelAdapter.CapturedModel model;
         private final long createdAtMillis;
+        private final WeakReference<Player> sourcePlayer;
         private PhysicsRagdoll physics;
         private boolean physicsAttempted;
 
         private StaticRagdoll(PlayerDeathSnapshot snapshot,
                               OpenYsmModelAdapter.CapturedModel model,
-                              long createdAtMillis) {
+                              long createdAtMillis, Player sourcePlayer) {
             this.snapshot = snapshot;
             this.model = model;
             this.createdAtMillis = createdAtMillis;
+            this.sourcePlayer = new WeakReference<>(sourcePlayer);
         }
 
         private PlayerDeathSnapshot snapshot() {
@@ -504,7 +518,7 @@ public final class ClientRagdollManager {
     private static final class PendingRagdoll {
         private final PlayerDeathSnapshot snapshot;
         private final OpenYsmModelAdapter.CapturedModel model;
-        private Player player;
+        private final Player player;
         private int ageTicks;
         private final long createdAtMillis;
 

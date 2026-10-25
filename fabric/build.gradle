@@ -64,7 +64,7 @@ def platformFiles = [
     'OpenYsmRagdollMod.java', 'ClientBootstrap.java', 'ClientRagdollEvents.java',
     'RagdollKeyMappings.java', 'RagdollNetwork.java', 'PlayerDeathSnapshot.java',
     'ExplosionImpulseSnapshot.java', 'ServerDeathEvents.java', 'ServerExplosionEvents.java',
-    'YsmPlatform.java', 'Ysm265MeshCaptureMixin.java'
+    'YsmPlatform.java', 'Ysm265MeshCaptureMixin.java', 'DeathRenderHandoffMixin.java'
 ]
 if (minecraftVersion == '1.21.1') {
     platformFiles += ['ClientVersion.java', 'DiscardingVertexConsumer.java', 'VersionedScreen.java']

@@ -40,8 +40,10 @@ class MeshCaptureTest {
         assertFalse(OpenYsmModelAdapter.onYsmMeshRender(pose.last(), new Object(), bones,
                 secondary, 0, 0, 0, 0, 1, 1, 1, 1, texture),
                 "Normal player rendering must not be cancelled");
+        assertFalse(OpenYsmModelAdapter.isCapturing());
         capture.set(context);
         try {
+            assertTrue(OpenYsmModelAdapter.isCapturing());
             assertTrue(OpenYsmModelAdapter.onYsmMeshRender(pose.last(), new Object(), bones,
                     secondary, 0, 0, 0, 0, 1, 1, 1, 1, texture));
             Object draft = field(contextType, "draft").get(context);
@@ -53,6 +55,7 @@ class MeshCaptureTest {
         } finally {
             capture.remove();
         }
+        assertFalse(OpenYsmModelAdapter.isCapturing());
     }
 
     @Test

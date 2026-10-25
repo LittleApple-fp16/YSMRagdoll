@@ -7,6 +7,7 @@ New release notes are generated from the matching version section. Historical da
 
 ### Fixed / 修复
 
+- 死亡布娃娃成功建立后接管原玩家模型的显示，避免 YSM 倒下动画与布娃娃同时出现；复活或捕获失败时保留正常玩家显示，手动测试布娃娃不会隐藏玩家。
 - 补充 Forge OpenYSM 的可读渲染器与玩家状态绑定，并捕获带纹理参数的网格入口，修复 OpenYSM 2.6.6.6 下死亡消息已收到却因查找官方 YSM 混淆类失败而不生成布娃娃的问题。
 - 将内嵌 OpenYSM 解析器及解密、压缩算法重定位到本模组的私有包，修复与 YSM 同时安装时 Forge 在模块解析阶段因重复包而崩溃的问题；Forge 与两个 Fabric 目标共用隔离规则。
 - 修复 Fabric 原生 YSM 骨骼的名称 ID 被误读为父索引、缺失真实层级导致的模型部件分离；读取客户端模型标识，并为加密模型补全骨骼层级匹配，保留大小写不同的骨骼名称及头部饰品的容器绑定。
