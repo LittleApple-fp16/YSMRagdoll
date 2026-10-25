@@ -22,6 +22,10 @@ JDK 17 应能被 Gradle toolchain 发现，必要时用
 ## 准备 OpenYSM 编译依赖 / Parser dependency
 
 三个目标共享以下固定依赖。构建只提取所需解析类并保留许可，不将完整 OpenYSM 模组打入发行包。
+`gradle/openysm-runtime.gradle` 在编译前将解析器、解密与 Zstd 类的字节码引用统一重定位到
+`com.ysmragdoll.internal.openysm`；自有动画类型映射也位于该私有包。
+编译、开发运行和发行包均使用隔离后的类，避免与 YSM 本体发生 Java 模块拆分包冲突。
+`check` 会检查输出中没有原始 `com.elfmcys.yesstevemodel` 或 `rip.ysm` 包；发布脚本另行检查成品。
 下载地址和 SHA-256 与 CI 固定值一致，依赖保存在 Git 忽略的 `libs/` 中。
 
 PowerShell：

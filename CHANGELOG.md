@@ -7,6 +7,7 @@ New release notes are generated from the matching version section. Historical da
 
 ### Fixed / 修复
 
+- 将内嵌 OpenYSM 解析器及解密、压缩算法重定位到本模组的私有包，修复与 YSM 同时安装时 Forge 在模块解析阶段因重复包而崩溃的问题；Forge 与两个 Fabric 目标共用隔离规则。
 - 修复 Fabric 原生 YSM 骨骼的名称 ID 被误读为父索引、缺失真实层级导致的模型部件分离；读取客户端模型标识，并为加密模型补全骨骼层级匹配，保留大小写不同的骨骼名称及头部饰品的容器绑定。
 - 隐藏或退化的模型部位不再创建刚体，避免零缩放造成矩阵求逆失败并使整具布娃娃回退为静态模型；初始化失败时清理已加入物理世界的对象。
 

@@ -1,9 +1,9 @@
 package com.ysmragdoll.client.physics;
 
-import rip.ysm.algorithms.CityHash;
-import rip.ysm.algorithms.MT19937;
-import rip.ysm.algorithms.XChaCha20;
-import rip.ysm.zstd.ZstdUtil;
+import com.ysmragdoll.internal.openysm.algorithms.CityHash;
+import com.ysmragdoll.internal.openysm.algorithms.MT19937;
+import com.ysmragdoll.internal.openysm.algorithms.XChaCha20;
+import com.ysmragdoll.internal.openysm.zstd.ZstdUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

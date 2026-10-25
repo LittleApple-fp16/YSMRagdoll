@@ -1,0 +1,68 @@
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.commons.ClassRemapper
+import org.objectweb.asm.commons.Remapper
+
+buildscript {
+    repositories { mavenCentral() }
+    dependencies { classpath 'org.ow2.asm:asm-commons:9.7.1' }
+}
+
+// Share the same private parser on Forge and Fabric, including development runs.
+// Relocate before compilation so no consumer can accidentally bind to YSM's copy.
+def runtimeDir = layout.buildDirectory.dir('generated/openysmRuntime')
+def namespaces = [
+        'com/elfmcys/yesstevemodel/': 'com/ysmragdoll/internal/openysm/',
+        'rip/ysm/'                 : 'com/ysmragdoll/internal/openysm/'
+]
+def extractRuntime = tasks.register('extractOpenYsmRuntime') {
+    inputs.file(project.openYsmJar)
+    inputs.property('namespaces', namespaces)
+    outputs.dir(runtimeDir)
+    doLast {
+        project.delete(runtimeDir)
+        def remapper = new Remapper() {
+            @Override
+            String map(String name) {
+                def namespace = namespaces.find { from, to -> name.startsWith(from) }
+                return namespace ? namespace.value + name.substring(namespace.key.length()) : name
+            }
+        }
+        zipTree(project.openYsmJar).matching {
+            include 'rip/ysm/algorithms/CityHash*.class'
+            include 'rip/ysm/algorithms/MT19937*.class'
+            include 'rip/ysm/algorithms/ChaCha20Base*.class'
+            include 'rip/ysm/algorithms/XChaCha20*.class'
+            include 'rip/ysm/zstd/**/*.class'
+            include 'rip/ysm/security/YSMByteBuf*.class'
+            include 'com/elfmcys/yesstevemodel/resource/YSMBinaryDeserializer*.class'
+            include 'com/elfmcys/yesstevemodel/resource/pojo/RawYsmModel*.class'
+        }.each { source ->
+            def reader = new ClassReader(source.bytes)
+            def writer = new ClassWriter(0)
+            reader.accept(new ClassRemapper(writer, remapper), 0)
+            def target = new File(runtimeDir.get().asFile, remapper.mapType(reader.className) + '.class')
+            target.parentFile.mkdirs()
+            target.bytes = writer.toByteArray()
+        }
+    }
+}
+
+dependencies {
+    compileOnly files(runtimeDir).builtBy(extractRuntime)
+}
+sourceSets.main.output.dir(runtimeDir, builtBy: extractRuntime)
+
+def verifyIsolation = tasks.register('verifyOpenYsmIsolation') {
+    dependsOn tasks.named('classes')
+    inputs.files(sourceSets.main.output)
+    doLast {
+        sourceSets.main.output.asFileTree.visit { entry ->
+            def name = entry.relativePath.pathString
+            if (name.endsWith('.class') && namespaces.keySet().any { name.startsWith(it) }) {
+                throw new GradleException("Unrelocated OpenYSM class in mod output: ${name}")
+            }
+        }
+    }
+}
+tasks.named('check').configure { dependsOn verifyIsolation }

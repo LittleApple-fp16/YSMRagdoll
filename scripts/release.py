@@ -16,6 +16,29 @@ VERSION = re.compile(
     re.ASCII,
 )
 TARGETS = ("forge-1.20.1", "fabric-1.20.1", "fabric-1.21.1")
+PARSER_ROOT = "com/ysmragdoll/internal/openysm/"
+
+
+def verify_parser_isolation(archive):
+    for name in archive.namelist():
+        class_name = re.sub(r"^META-INF/versions/\d+/", "", name)
+        if class_name.endswith(".class") and class_name.startswith(
+            ("com/elfmcys/yesstevemodel/", "rip/ysm/")
+        ):
+            raise ValueError("Unrelocated OpenYSM class: " + name)
+    for name in (
+        "resource/YSMBinaryDeserializer.class",
+        "resource/YSMFolderDeserializer.class",
+        "resource/pojo/RawYsmModel.class",
+        "algorithms/CityHash.class",
+        "algorithms/MT19937.class",
+        "algorithms/ChaCha20Base.class",
+        "algorithms/XChaCha20.class",
+        "security/YSMByteBuf.class",
+        "zstd/ZstdUtil.class",
+    ):
+        if not archive.read(PARSER_ROOT + name):
+            raise ValueError("Empty private parser entry: " + name)
 
 
 def asset_name(version, target="forge-1.20.1"):
@@ -81,6 +104,7 @@ def prepare(root, tag, target="forge-1.20.1"):
     with zipfile.ZipFile(jar) as archive:
         if archive.testzip():
             raise ValueError("Corrupt JAR")
+        verify_parser_isolation(archive)
         manifest = archive.read("META-INF/MANIFEST.MF").decode("utf-8")
         if f"Implementation-Version: {version}" not in manifest.splitlines():
             raise ValueError("JAR manifest version mismatch")
@@ -127,7 +151,6 @@ def prepare(root, tag, target="forge-1.20.1"):
             "META-INF/licenses/YSMRAGDOLL-LICENSE.txt",
             "META-INF/licenses/OpenYSM-LICENSE.txt",
             "com/ysmragdoll/OpenYsmRagdollMod.class",
-            "com/elfmcys/yesstevemodel/resource/YSMBinaryDeserializer.class",
             "com/ysmragdoll/mixin/Ysm265MeshCaptureMixin.class",
         ):
             if not archive.read(required):
@@ -142,6 +165,7 @@ def verify_fabric(jar, version, minecraft):
     with zipfile.ZipFile(jar) as archive:
         if archive.testzip():
             raise ValueError("Corrupt Fabric JAR")
+        verify_parser_isolation(archive)
         metadata = json.loads(archive.read("fabric.mod.json"))
         if metadata.get("id") != "ysmragdoll" or metadata.get("version") != version:
             raise ValueError("Fabric mod ID or version mismatch")
@@ -161,7 +185,6 @@ def verify_fabric(jar, version, minecraft):
             "META-INF/licenses/OpenYSM-LICENSE.txt",
             "com/ysmragdoll/OpenYsmRagdollMod.class",
             "com/ysmragdoll/client/ClientBootstrap.class",
-            "com/elfmcys/yesstevemodel/resource/YSMBinaryDeserializer.class",
             "com/ysmragdoll/mixin/Ysm265MeshCaptureMixin.class",
             "ysmragdoll-platform.properties",
             "ysmragdoll.refmap.json",

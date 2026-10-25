@@ -1,4 +1,4 @@
-package com.elfmcys.yesstevemodel.resource;
+package com.ysmragdoll.internal.openysm.resource;
 
 /** 仅提供二进制解析器需要的动画类型映射，不替代 YSM 的文件夹加载器。 */
 public final class YSMFolderDeserializer {

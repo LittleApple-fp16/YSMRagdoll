@@ -76,6 +76,22 @@ jobs:
       - name: Run tests and build
         run: bash ./gradlew --no-daemon ${{ matrix.args }} clean build
 
+      - name: Verify packaged parser isolation
+        env:
+          PACKAGE_DIR: ${{ matrix.output }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from zipfile import ZipFile
+          from scripts.release import verify_parser_isolation
+
+          jar, = Path(os.environ["PACKAGE_DIR"], "libs").glob("*-all.jar")
+          with ZipFile(jar) as archive:
+              verify_parser_isolation(archive)
+          print("Verified private OpenYSM packages:", jar)
+          PY
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

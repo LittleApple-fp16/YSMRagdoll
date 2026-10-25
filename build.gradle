@@ -44,7 +44,7 @@ repositories {
 
 // OpenYSM 是本工程解析 YSM 二进制模型所需的编译期依赖。将 JAR 放在工程内部，
 // 可以保证 ZIP 解压后不依赖相邻目录；它不会被整体打入 ysmragdoll 成品。
-def openYsmJar = file(findProperty('openysm_jar')
+ext.openYsmJar = file(findProperty('openysm_jar')
         ?: 'libs/openysm-2.6.5-forge+mc1.20.1.jar')
 if (!openYsmJar.isFile()) {
     throw new GradleException("缺少构建依赖: ${openYsmJar}. 请重新解压完整的 ysmragdoll 工程包。")
@@ -52,9 +52,6 @@ if (!openYsmJar.isFile()) {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-
-    // 只在编译期引用 OpenYSM 的公开类型；运行时所需的最小解析类由下方任务提取。
-    compileOnly files(openYsmJar)
 
     implementation('cz.advel.jbullet:jbullet:20101010-1') {
         // JBullet 自带的旧 vecmath 会与显式版本重复，统一由下面的 1.5.2 提供。
@@ -74,22 +71,7 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-def openYsmRuntimeDir = layout.buildDirectory.dir('generated/openysmRuntime')
-def extractOpenYsmRuntime = tasks.register('extractOpenYsmRuntime', Sync) {
-    // 仅提取解密、Zstd 和二进制模型解析所需的 OpenYSM 类，避免重复分发整个模组。
-    into openYsmRuntimeDir
-    from(zipTree(openYsmJar)) {
-        include 'rip/ysm/algorithms/CityHash*.class'
-        include 'rip/ysm/algorithms/MT19937*.class'
-        include 'rip/ysm/algorithms/ChaCha20Base*.class'
-        include 'rip/ysm/algorithms/XChaCha20*.class'
-        include 'rip/ysm/zstd/**/*.class'
-        include 'rip/ysm/security/YSMByteBuf*.class'
-        include 'com/elfmcys/yesstevemodel/resource/YSMBinaryDeserializer*.class'
-        include 'com/elfmcys/yesstevemodel/resource/pojo/RawYsmModel*.class'
-    }
-}
-sourceSets.main.output.dir(openYsmRuntimeDir, builtBy: extractOpenYsmRuntime)
+apply from: 'gradle/openysm-runtime.gradle'
 
 processResources {
     from('LICENSE') {

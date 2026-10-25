@@ -9,6 +9,14 @@ import hashlib
 import release
 
 
+PARSER_ENTRIES = (
+    "resource/YSMBinaryDeserializer.class", "resource/YSMFolderDeserializer.class",
+    "resource/pojo/RawYsmModel.class", "algorithms/CityHash.class",
+    "algorithms/MT19937.class", "algorithms/ChaCha20Base.class",
+    "algorithms/XChaCha20.class", "security/YSMByteBuf.class", "zstd/ZstdUtil.class",
+)
+
+
 class ReleaseTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -82,10 +90,11 @@ versionRange="[47.4.0,48)"
                 "META-INF/licenses/YSMRAGDOLL-LICENSE.txt",
                 "META-INF/licenses/OpenYSM-LICENSE.txt",
                 "com/ysmragdoll/OpenYsmRagdollMod.class",
-                "com/elfmcys/yesstevemodel/resource/YSMBinaryDeserializer.class",
                 "com/ysmragdoll/mixin/Ysm265MeshCaptureMixin.class",
             ):
                 jar.writestr(required, "fixture")
+            for name in PARSER_ENTRIES:
+                jar.writestr(release.PARSER_ROOT + name, "fixture")
             jar.writestr("ysmragdoll.mixins.json", '{"client":["Ysm265MeshCaptureMixin"]}')
         return path
 
@@ -162,12 +171,42 @@ versionRange="[47.4.0,48)"
                 "META-INF/licenses/YSMRAGDOLL-LICENSE.txt", "META-INF/licenses/OpenYSM-LICENSE.txt",
                 "com/ysmragdoll/OpenYsmRagdollMod.class",
                 "com/ysmragdoll/client/ClientBootstrap.class",
-                "com/elfmcys/yesstevemodel/resource/YSMBinaryDeserializer.class",
                 "com/ysmragdoll/mixin/Ysm265MeshCaptureMixin.class",
                 "ysmragdoll-platform.properties", "ysmragdoll.refmap.json",
             ):
                 jar.writestr(name, b"fixture")
+            for name in PARSER_ENTRIES:
+                jar.writestr(release.PARSER_ROOT + name, "fixture")
         return path
+
+    def test_rejects_unrelocated_parser_on_every_target(self):
+        for target in release.TARGETS:
+            for name in (
+                "com/elfmcys/yesstevemodel/resource/YSMFolderDeserializer.class",
+                "com/elfmcys/yesstevemodel/resource/pojo/RawYsmModel$RawBone.class",
+                "rip/ysm/zstd/ZstdUtil.class",
+                "META-INF/versions/17/rip/ysm/algorithms/CityHash.class",
+            ):
+                with self.subTest(target=target, name=name):
+                    jar = (self.make_jar() if target.startswith("forge-")
+                           else self.make_fabric_jar(target.split("-", 1)[1]))
+                    with zipfile.ZipFile(jar, "a") as archive:
+                        archive.writestr(name, b"fixture")
+                    with self.assertRaisesRegex(ValueError, "Unrelocated OpenYSM"):
+                        release.prepare(self.root, "v1.2.3", target)
+
+    def test_rejects_missing_private_parser_class(self):
+        for missing in PARSER_ENTRIES:
+            with self.subTest(missing=missing):
+                jar = self.make_jar()
+                with zipfile.ZipFile(jar) as archive:
+                    entries = {name: archive.read(name) for name in archive.namelist()
+                               if name != release.PARSER_ROOT + missing}
+                with zipfile.ZipFile(jar, "w") as archive:
+                    for name, data in entries.items():
+                        archive.writestr(name, data)
+                with self.assertRaises(KeyError):
+                    release.prepare(self.root, "v1.2.3")
 
     def test_prepares_both_fabric_targets(self):
         for minecraft in ("1.20.1", "1.21.1"):
