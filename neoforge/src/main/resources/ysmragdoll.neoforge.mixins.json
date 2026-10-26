@@ -4,6 +4,6 @@
   "package": "com.ysmragdoll.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": ["ExplosionMixin"],
-  "client": ["Ysm265MeshCaptureMixin", "DeathRenderHandoffMixin", "YsmPlayerRenderMixin"],
+  "client": ["Ysm265MeshCaptureMixin", "OpenYsmMeshCaptureMixin", "DeathRenderHandoffMixin", "YsmPlayerRenderMixin", "OpenYsmPlayerRenderMixin"],
   "injectors": {"defaultRequire": 1}
 }

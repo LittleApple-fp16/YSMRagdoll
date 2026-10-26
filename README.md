@@ -16,7 +16,7 @@ YSM Ragdoll 是面向 Yes Steve Model（YSM）的 Minecraft 模组。它保留�
 
 | 版本 | Minecraft | 加载器 | Java | 下载 |
 | --- | --- | --- | --- | --- |
-| **0.5.28** | 1.21.1 | NeoForge 21.1.x | 21 | [NeoForge 安装包](https://github.com/LittleApple-fp16/YSMRagdoll/releases) |
+| **0.5.29** | 1.21.1 | NeoForge 21.1.x | 21 | [NeoForge 安装包](https://github.com/LittleApple-fp16/YSMRagdoll/releases) |
 | **0.5.26 正式版** | 1.20.1 | Forge 47.4.x | 17 | [Forge 安装包](https://github.com/Esnowflake/YSMRagdoll/releases/download/0.5.26/ysmragdoll-0.5.26-all.jar) |
 | 0.5.26-beta.1 测试版 | 1.20.1 | Forge 47.4.x | 17 | [Forge Beta](https://github.com/Esnowflake/YSMRagdoll/releases/download/v0.5.26-beta.1/ysmragdoll-0.5.26-beta.1%2Bmc1.20.1-forge-all.jar) |
 | 0.5.26-beta.1 测试版 | 1.20.1 | Fabric Loader ≥ 0.16.14 | 17 | [Fabric 1.20.1 Beta](https://github.com/Esnowflake/YSMRagdoll/releases/download/v0.5.26-beta.1/ysmragdoll-0.5.26-beta.1%2Bmc1.20.1-fabric-all.jar) |

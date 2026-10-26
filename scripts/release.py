@@ -185,7 +185,8 @@ def verify_neoforge(jar, version):
         if dependencies.get("neoforge", {}).get("versionRange") != "[21.1.0,21.2)":
             raise ValueError("NeoForge loader version mismatch")
         config = json.loads(archive.read("ysmragdoll.neoforge.mixins.json"))
-        if set(config.get("client", [])) != {"Ysm265MeshCaptureMixin", "DeathRenderHandoffMixin", "YsmPlayerRenderMixin"}:
+        if set(config.get("client", [])) != {"Ysm265MeshCaptureMixin", "OpenYsmMeshCaptureMixin",
+                                              "DeathRenderHandoffMixin", "YsmPlayerRenderMixin", "OpenYsmPlayerRenderMixin"}:
             raise ValueError("NeoForge client mixin mismatch")
         if config.get("mixins") != ["ExplosionMixin"]:
             raise ValueError("NeoForge common mixin mismatch")
